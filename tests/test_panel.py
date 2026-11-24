@@ -9,7 +9,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PKG = Path(os.environ.get("MATERIAL_PKG", "/nonexistent/material-grub-package"))
 sys.path.insert(0, str(ROOT))
-from material_boot import scenes as mgscenes_mod  # noqa: E402
+
+try:
+    from material_boot import scenes as mgscenes_mod  # noqa: E402
+except ImportError:  # no Pillow: the renderer cannot be imported, and these tests cannot run
+    mgscenes_mod = None
 
 
 def mean_diff(a, b):
@@ -20,7 +24,8 @@ def mean_diff(a, b):
 
 
 @unittest.skipUnless(
-    (PKG / "subtitles.json").is_file() and (PKG / "scenes/16x9/bg").is_dir(), "no built package with subtitles.json"
+    mgscenes_mod is not None and (PKG / "subtitles.json").is_file() and (PKG / "scenes/16x9/bg").is_dir(),
+    "no Pillow, or no built package with subtitles.json (set MATERIAL_PKG)",
 )
 class PanelScene(unittest.TestCase):
     @classmethod
