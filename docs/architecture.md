@@ -56,7 +56,7 @@ The installer and the packages always assume an install may exist (plan 9c). The
 
 ## Verification rule for the moves
 
-Before any module moves, a snapshot of full renders (styles x schemes x seeds x resolutions) and of the Plymouth layers is taken from the current code. Every pull request that moves code must reproduce it byte for byte: `tests/snapshot/snapshot.py --core` swaps the moved modules for shims onto this package (`MOVED` and `PARTIAL` in that file grow with each move: a partly moved module such as `mgrub` is rebuilt without the moved definitions, which are imported from here), and `tests/test_provenance.py` checks that every moved definition equals the original, statement for statement and compares with `golden.json`.
+Before any module moves, a snapshot of full renders (styles x schemes x seeds x resolutions) and of the Plymouth layers is taken from the current code. Every pull request that moves code must reproduce it byte for byte: `tests/snapshot/snapshot.py --core` swaps the moved modules for shims onto this package (`MOVED` and `PARTIAL` in that file grow with each move: a partly moved module such as `mgrub` is rebuilt without the moved definitions, which are imported from here), and `tests/test_provenance.py` checks that every moved definition equals the original, statement for statement. The strongest gate is `tests/gate/grub_suites.py`: it runs **material-grub's own unit suites** (the 50 upgrade tests included) on a copy of its checkout whose moved modules come from here, next to the same suites on the unmodified copy, and fails when a suite that passes on the original fails on the core's. `tests/gate/moves.py` is the one table all of these read and compares with `golden.json`.
 
 ## Pull requests
 

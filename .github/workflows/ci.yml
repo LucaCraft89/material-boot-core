@@ -74,6 +74,9 @@ jobs:
           python scripts/compare_data.py "$RUNNER_TEMP/data-dark" "$RUNNER_TEMP/pkg-dark"
           python scripts/build_data.py --out "$RUNNER_TEMP/data-light" --scheme light
           python scripts/compare_data.py "$RUNNER_TEMP/data-light" "$RUNNER_TEMP/pkg-light"
+      - name: material-grub's own unit suites pass on the core's code (every suite that passes on material-grub's own must pass on the core's)
+        timeout-minutes: 25
+        run: python tests/gate/grub_suites.py --grub material-grub --pkg "$RUNNER_TEMP/pkg-dark"
       - name: Moved code is the original code (syntax trees equal)
         run: python -m unittest -v tests.test_provenance
         env:
