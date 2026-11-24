@@ -2,12 +2,12 @@
 name = "material-boot-core"
 version = "1.0.0"   # kept equal to VERSION (tests/test_skeleton.py checks it)
 description = "The code Material GRUB and Material Plymouth share, and the material-boot command"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = {text = "MIT"}
 
 [tool.ruff]
 line-length = 120
-target-version = "py38"
+target-version = "py39"
 extend-exclude = ["material_boot/_vendor"]   # unmodified copy of a third-party package
 
 [tool.ruff.lint]
