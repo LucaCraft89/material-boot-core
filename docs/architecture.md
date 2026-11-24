@@ -19,6 +19,8 @@ material-boot help | version          the only top-level words (they must work w
 
 Shared by every part: the conf, rules and title parsing; `overrides.json`, presets, palettes, seeds and the per-entry customisation (`mgcustom`); the renderer primitives, palettes, glyphs and fonts; the distro data (`palettes.json`, `classes.json`, the catalog rules, glyphs); the guarded backup / apply / validate / roll-back pattern; the state record, install detection and migrations; the module registry; the dispatcher and menu; the installer framework.
 
+**The renderer moves whole** (`scenes`, `custom`, `bgrt_logo`): material-plymouth calls most of it (`hero`, `draw_list`, `draw_side_hero`, `draw_cookie`, `list_label`, ...), so a cut between "primitives" and "GRUB layouts" would be arbitrary. The core therefore still carries some GRUB-flavoured drawing (the rail, the key hints); separating it is a later cleanup, under the same pixel gate.
+
 Stays in the parts: GRUB scene layouts, resolutions, BLS handling, the `grub.d` scripts, units and hooks, Ventoy (material-grub); the initramfs, kernel command line and script theme (material-plymouth).
 
 ## Packages and paths
@@ -50,7 +52,7 @@ The installer and the packages always assume an install may exist (plan 9c). The
 
 ## Verification rule for the moves
 
-Before any module moves, a snapshot of full renders (styles x schemes x seeds x resolutions) and of the Plymouth layers is taken from the current code. Every pull request that moves code must reproduce it byte for byte.
+Before any module moves, a snapshot of full renders (styles x schemes x seeds x resolutions) and of the Plymouth layers is taken from the current code. Every pull request that moves code must reproduce it byte for byte: `tests/snapshot/snapshot.py --core` swaps the moved modules for shims onto this package (`MOVED` in that file grows with each move) and compares with `golden.json`.
 
 ## Pull requests
 
