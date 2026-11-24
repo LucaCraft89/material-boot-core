@@ -1,0 +1,35 @@
+name: CI
+on:
+  push: {branches: [main]}
+  pull_request:
+  workflow_dispatch:
+permissions: {contents: read}
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (ruff, actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx install ruff && pipx install actionlint-py
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: actionlint
+
+  unit:
+    name: Unit tests (Python ${{ matrix.python }})
+    # Python 3.8 is the oldest Python the material-grub tools run on (RHEL 8 family), 3.13 the newest in use. Pinned to 24.04: `ubuntu-latest` has no
+    # Python 3.8 for setup-python.
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.8", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "${{ matrix.python }}"}
+      - run: python -m unittest discover -s tests -v

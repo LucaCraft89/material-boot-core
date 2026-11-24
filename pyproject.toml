@@ -1,0 +1,15 @@
+[project]
+name = "material-boot-core"
+version = "1.0.0"   # kept equal to VERSION (tests/test_skeleton.py checks it)
+description = "The code Material GRUB and Material Plymouth share, and the material-boot command"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+
+[tool.ruff]
+line-length = 120
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+# E501: `ruff format` wraps code; long comments and message strings are left as written.
+ignore = ["E501"]
