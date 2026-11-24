@@ -56,7 +56,8 @@ A Python file that the core imports (its own directory is on `sys.path` while it
 def main(argv, core):
     """`material-boot <name> <argv...>`. Return the exit status (None counts as 0)."""
 
-def hook_install(ctx): ...      # one function per hook the manifest lists, named hook_<name>
+
+def hook_install(ctx): ...  # one function per hook the manifest lists, named hook_<name>
 ```
 
 `main` parses its own arguments. An uncaught exception is reported as "the <name> part failed" and exits 1; `SystemExit` codes are honoured; Ctrl-C exits 130. A manifest that lists a hook the file does not define is a load error, so a half-updated package is caught early.
