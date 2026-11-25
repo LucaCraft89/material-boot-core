@@ -41,7 +41,10 @@ jobs:
     name: Render snapshot (identical pixels)
     runs-on: ubuntu-24.04
     env:
-      MATERIAL_GRUB_REF: ${{ vars.MATERIAL_GRUB_REF || 'release/0.8.0' }}
+      # The BASELINE of the gates below (the picture snapshot, the suites gate, the provenance test) is material-grub as it was BEFORE it started using this core
+      # (merge of #16 into release/0.8.0): they compare the moved code with the original. Pinned to that commit, so that material-grub's own move to the core
+      # (G1) does not turn the baseline into a copy of this repository. The reverse check, material-grub's suites running on this core, is material-grub's CI.
+      MATERIAL_GRUB_REF: ${{ vars.MATERIAL_GRUB_REF || '588f909868d71d7fa0c76125b483ded568a04a28' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4

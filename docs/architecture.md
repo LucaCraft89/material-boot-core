@@ -64,3 +64,8 @@ Before any module moves, a snapshot of full renders (styles x schemes x seeds x 
 ## Pull requests
 
 Core into `main`: C1 this skeleton; C2 the pure modules, their tests and the data; C3 guarded, state, detect, migrate, registry; C4 dispatcher, `material-boot` and the menu; C5 installer framework, bundle builder, packages. Then material-grub (G1 to G4) and material-plymouth (P1 to P3), and a final one for the unified installer and the whole test matrix. Never one change to `main`.
+
+## After material-grub switches over (G1)
+
+The gates above compare the moved code with material-grub's original. Once material-grub imports the core (G1), its own modules are the core's, so a baseline taken from `release/0.8.0` would compare the core with itself. The CI therefore **pins the baseline to the last commit before the switch** (`MATERIAL_GRUB_REF`, `588f909`), and the check in the other direction, material-grub's unit suites running on this core, is done by material-grub's CI (it checks this repository out next to itself).
+
