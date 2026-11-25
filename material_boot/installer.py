@@ -445,7 +445,10 @@ class Installer:
                     self.results.append((p.name, "failed", "; ".join(map(str, problems))))
                     self.results += [(q.name, "not run", "") for q in self.parts[idx + 1 :]]
                     return False
-            self.record(p)
+            if value.get(
+                "record", True
+            ):  # a part that only built something (stage-only) says so: it must not be recorded as installed
+                self.record(p)
             self.results.append((p.name, "installed" if value.get("changed", True) else "unchanged", ""))
             self.emit("ok", text=f"{p.title} {p.version} installed", part=p.name)
         return True

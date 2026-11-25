@@ -46,7 +46,7 @@ def hook_install(ctx):
         st = state.read(ctx.root) or {"state": 1, "parts": {}}
         st.setdefault("parts", {})[CFG["name"]] = CFG["state_entry"]
         state.write(ctx.root, st)
-    return {"changed": True, "notes": ["did " + CFG["name"]]}
+    return {"changed": True, "notes": ["did " + CFG["name"]], "record": CFG.get("record", True)}
 
 def hook_verify(ctx):
     _log("verify")
@@ -371,6 +371,13 @@ class Run(Base):
                 rc, _ = self.run_cli("--yes", *argv)
             self.assertEqual(rc, 0)
             self.assertEqual([c["json"] for c in self.calls() if c["hook"] == "install" and c["part"] == "aaa"], [want])
+
+    def test_a_part_that_only_built_something_is_not_recorded(self):
+        self.part("aaa", install={"default": True}, record=False)
+        self.part("bbb", install={"default": True})
+        rc, _ = self.run_cli("--yes")
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.recorded(), {"bbb": "1.0.0"})
 
     def test_a_part_that_fails_its_verify_is_a_failure(self):
         self.part("aaa", install={"default": True}, problems=["the theme is missing"])

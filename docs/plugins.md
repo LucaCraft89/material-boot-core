@@ -85,7 +85,7 @@ Called by the unified installer, `doctor` and the upgrade machinery, each as `ho
 |---|---|
 | `detect` | what is installed: found or not, version, how (`package`, `source`, `immutable`), problems |
 | `plan` | sentences for what `install` would change now (the dry-run) |
-| `install` | `{"changed": bool, "notes": [...]}`; raises on failure; must be idempotent and leave the old install working until the swap |
+| `install` | `{"changed": bool, "notes": [...], "record": bool}` (`record: false`: nothing was installed, so the state record must not say it was; default true); raises on failure; must be idempotent and leave the old install working until the swap |
 | `uninstall` | the same, and must remove only what the part installed |
 | `migrate` | results of the part's ordered, idempotent migration steps for an older install |
 | `verify` | a list of problems (empty when healthy) |
