@@ -81,6 +81,8 @@ jobs:
         run: python -m unittest -v tests.test_provenance
         env:
           MATERIAL_GRUB: ${{ github.workspace }}/material-grub
+      - name: The core installs itself, and a bundle installs from its unpacked tree (real data build on a staged root)
+        run: python -m unittest -v tests.test_coreinstall tests.test_bundle
       - name: Renderer tests that need a built package
         run: python -m unittest -v tests.test_panel tests.test_custom
         env:

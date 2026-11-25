@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
-from . import __version__, detect, migrate, plugins, state
+from . import __version__, coreinstall, detect, migrate, plugins, state
 from . import conf as mgconf
 from . import overrides as mgoverrides
 from . import seeds as mgseeds
@@ -165,6 +165,13 @@ def select(parts, installed, o):
     parts whose manifest says install.default (unless `--with` chose some); plus `--with`, minus `--without`; `needs` is followed."""
     by = {p.name: p for p in parts}
     errors, notes = [], []
+
+    def needs_of(p):
+        # every part needs the core (its library, its data, its command), and the core is installed first
+        return p.needs if p.name == "core" or "core" not in by else ["core", *p.needs]
+
+    if "core" in o.without:
+        errors.append("the core cannot be left out: every part needs it (--without core does not exist)")
     for n in [*o.with_, *o.without, *([o.only] if o.only else [])]:
         if n not in by:
             errors.append(f"there is no part called '{n}' (known: {', '.join(sorted(by)) or 'none'})")
@@ -178,6 +185,10 @@ def select(parts, installed, o):
         chosen = set(installed) if installed else fresh
         chosen |= set(o.with_)
         chosen -= set(o.without)
+        if o.uninstall and "core" not in o.with_:
+            chosen.discard(
+                "core"
+            )  # the core goes last and only on request (--only core): the parts are what was asked about
     for n in sorted(chosen):
         if by[n].problem:
             errors.append(f"cannot use '{n}': {by[n].problem}")
@@ -185,7 +196,7 @@ def select(parts, installed, o):
     todo = sorted(chosen)
     while todo:
         n = todo.pop()
-        for need in by[n].needs:
+        for need in needs_of(by[n]):
             if need in chosen or need in installed:
                 continue
             if need not in by:
@@ -204,7 +215,7 @@ def select(parts, installed, o):
         if n in seen or n not in chosen:
             return
         seen.add(n)
-        for need in sorted(by[n].needs):
+        for need in sorted(needs_of(by[n])):
             visit(need)
         ordered.append(by[n])
 
@@ -278,6 +289,8 @@ class Installer:
             backup_dir=getattr(self, "backup", None),
             previous=(state.read(self.root) or {}).get("parts", {}).get(part.name) if part else None,
             target_version=part.version if part else __version__,
+            how=self.how,
+            source=self.o.bundle,
         )
 
     # -- the stages
@@ -511,6 +524,7 @@ class Installer:
 def available_parts(bundle=None):
     """Every part that can be installed: the bundle's (when there is one) and the installed ones; a bundle's record wins, it is the version to install."""
     found = {p.name: p for p in plugins.discover()}
+    found["core"] = coreinstall.part()  # the core is a part like the others, and the first
     for p in plugins.discover_bundle(bundle) if bundle else []:
         found[p.name] = p
     return [found[k] for k in sorted(found)]

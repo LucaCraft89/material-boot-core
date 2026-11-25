@@ -265,6 +265,8 @@ def find(name, dirs=None, core_version=None):
 def load(part):
     """Import the part's entry file. Raises ImportError with a readable message when it cannot be loaded, has no main(), or lacks a hook its manifest
     promises."""
+    if getattr(part, "module", None) is not None:  # a built-in part (the core's own) that is already imported
+        return part.module
     spec = importlib.util.spec_from_file_location(f"mbpart_{part.name.replace('-', '_')}", part.entry)
     if spec is None or spec.loader is None:
         raise ImportError(f"{part.entry} is not a Python file")
@@ -359,10 +361,13 @@ def make_ctx(
     backup_dir=None,
     previous=None,
     target_version=None,
+    how="source",
+    source=None,
 ):
     """The `ctx` every hook_<name>(ctx) gets (docs/plugins.md): the `core` object, `root` (a staged tree for tests and packaging; empty for the real
     system), `dry_run`, `yes`, `progress(event)` (the --progress json stream), `options` (the part's own installer choices), `conf` (the settings),
-    `backup_dir`, `previous` (what the state record says about this part, or None) and `target_version`."""
+    `backup_dir`, `previous` (what the state record says about this part, or None), `target_version`, `how` (`source`, `package` or `immutable`: how THIS
+    run installs) and `source` (the bundle's directory when the run is from a bundle, else None)."""
     return SimpleNamespace(
         core=core or make_core(),
         root=root,
@@ -374,4 +379,6 @@ def make_ctx(
         backup_dir=backup_dir,
         previous=previous,
         target_version=target_version or __version__,
+        how=how,
+        source=source,
     )

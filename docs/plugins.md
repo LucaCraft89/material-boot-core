@@ -102,3 +102,8 @@ Called by the unified installer, `doctor` and the upgrade machinery, each as `ho
 ## Testing a part
 
 Put a manifest and an entry file in a temporary directory, set `MATERIAL_PLUGIN_PATH` to it, and run `material-boot <part> ...`; or call `material_boot.plugins.read_manifest`, `discover`, `run` and `call_hook` directly, as `tests/test_plugins.py` does.
+
+## Shipping a part: `material-boot-part.json`
+
+A part's repository keeps its manifest at its root as `material-boot-part.json` (the same file as the one the package installs into `plugins.d`, with `entry` relative to the repository). The bundle builder takes the part's committed files into `parts/<name>/`, checks that the manifest is usable, and copies it to `parts/<name>/manifest.json`, which is where the installer looks for parts that are not installed yet. See [installer.md](installer.md).
+

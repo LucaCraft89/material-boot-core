@@ -74,3 +74,30 @@ Each package ships its part's sources and installs its manifest. **Decision (scr
 - The TUI (`install/tui.py`, 1,100 lines) asks GRUB's questions. The unified one asks which parts and the shared look and lets a part add questions through a future `hook_questions`; until then GRUB's TUI runs inside GRUB's `hook_install` when a terminal is present.
 - Ventoy sticks are a GRUB-only mode (`--ventoy`); the stick's version marker and `doctor` warning from the plan are still to do.
 - Whether a part's migration steps register through `hook_migrate` or through `migrate.STEPS` (only the core's `ConfSamples` is there today).
+
+## The core's own install (implemented: `material_boot/coreinstall.py`)
+
+The core is a part like the others, **always chosen first**, and every other part needs it (`--without core` does not exist; it is removed only with `--only core`). Its hooks:
+
+- a **source install** copies `lib/material_boot`, `scripts/` and `assets/` from the bundle to `/usr/share/material-boot`, installs the command as `/usr/local/bin/material-boot`, and creates `plugins.d`; a **package** lays those files out itself (`ctx.how == "package"`) and only needs the next step;
+- it **builds the shared data on the target** (`scripts/build_data.py`: palettes, classes, rules, titles, subtitles, glyphs, the font) for the configured scheme, into `data.new` and then swaps it over `data`, so a failed build leaves the old data in place. The data is scheme-specific, so `material-boot core apply` rebuilds it when `SCHEME` changed;
+- it needs Pillow and `rsvg-convert` (or ImageMagick) and says exactly what is missing before it touches anything. Installing those dependencies is not the core's job (the packages declare them).
+
+## The bundle (implemented: `scripts/build_bundle.py`, `packaging/bundle/install.sh`, `bundle.json`)
+
+`python3 scripts/build_bundle.py --out DIR` writes `material-boot-<version>.tar.gz` and its `.sha256`:
+
+```
+material-boot-<version>/
+  install.sh  VERSION  LICENSE  THIRD_PARTY.md  BUNDLE.json  SHA256SUMS
+  lib/material_boot/  bin/material-boot  scripts/build_data.py  assets/
+  parts/<name>/   the part's repository (its committed files), with its manifest also as manifest.json
+```
+
+- **A part publishes its manifest as `material-boot-part.json` at the root of its repository** (plugin API 2, `entry` relative to the repository). The build refuses a part without one, with a manifest the core cannot use (wrong API, `core_min` newer than this core, a name that is not the one `bundle.json` gives it), so a bundle never holds a part the installer would then refuse.
+- **`bundle.json` pins the parts** (`repo` and `ref`). `--release` accepts only tags (`v1.2.3`): a release is never built from a branch. Until the three repositories are tagged the refs are branches, for development builds. `--part NAME=PATH` uses a local checkout instead.
+- **The build is reproducible**: entries sorted, owner 0, one fixed time (`--epoch`, `$SOURCE_DATE_EPOCH`, else the last commit), gzip without a time stamp. `BUNDLE.json` records the commit and the version of every part; `SHA256SUMS` covers every file.
+- **`install.sh`** verifies `SHA256SUMS` (`--no-verify` skips it), finds a Python 3.9+ (or says which package to install), asks sudo itself when it needs root (there is no `material-boot` command yet to ask again), and runs `python -m material_boot core install --bundle <the tree>` with the library from the bundle.
+
+Not built yet: the core's own packages (C5c), a bundle of real parts (they get their manifests in G2 and P2), and the release workflow that attaches the tarball to a tag.
+

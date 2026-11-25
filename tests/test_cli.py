@@ -232,6 +232,37 @@ class Presets(Base):
         self.assertIn("Presets", [i[0] for i in menu.menu_items()])
 
 
+class ApplyRefreshesTheData(Base):
+    def test_a_changed_scheme_rebuilds_the_shared_data_before_the_parts_run(self):
+        calls = []
+        self.conf.write_text("SCHEME=light\n")
+        with mock.patch(
+            "material_boot.coreinstall.refresh_data",
+            side_effect=lambda root, scheme: (
+                calls.append((root, scheme)) or "rebuilt the shared data for the light scheme"
+            ),
+        ):
+            rc, out, _ = self.call("core", "apply")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(calls, [("", "light")])
+        self.assertIn("rebuilt the shared data for the light scheme", out)
+
+    def test_a_failed_rebuild_stops_before_the_parts(self):
+        self.part("plymouth", commands={"apply": "x"}, src="def main(argv, core):\n    print('RAN')\n    return 0\n")
+        with mock.patch(
+            "material_boot.coreinstall.refresh_data", side_effect=RuntimeError("building the shared data failed: boom")
+        ):
+            rc, out, _ = self.call("core", "apply")
+        self.assertEqual(rc, 1)
+        self.assertIn("boom", out)
+        self.assertNotIn("RAN", out)
+
+    def test_only_a_part_does_not_touch_the_data(self):
+        self.part("plymouth", commands={"apply": "x"})
+        with mock.patch("material_boot.coreinstall.refresh_data", side_effect=AssertionError("must not run")):
+            self.assertEqual(self.call("core", "apply", "--only", "plymouth")[0], 0)
+
+
 class Apply(Base):
     APPLY = "def main(argv, core):\n    print('apply {n}', argv)\n    return {rc}\n"
 
