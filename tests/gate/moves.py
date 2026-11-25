@@ -16,6 +16,7 @@ MOVED = {
     "mgscenes": "scenes",
     "mgcustom": "custom",
     "mgmigrate": "migrate",
+    "mgpresets": "presets",
 }
 # Modules that were only partly moved: material-grub module -> [(material_boot module, [names that moved])]. The original file is rebuilt without those
 # definitions and imports them from the core, which is what material-grub's own switch-over does.
