@@ -101,3 +101,9 @@ material-boot-<version>/
 
 Not built yet: the core's own packages (C5c), a bundle of real parts (they get their manifests in G2 and P2), and the release workflow that attaches the tarball to a tag.
 
+## The core's packages (implemented: `packaging/`, `tests/containers/`)
+
+`material-boot-core` as an rpm (`packaging/rpm/material-boot-core.spec`), a deb (`packaging/debian/`) and an Arch package (`packaging/arch/`), all laid out by `packaging/common/install-tree.sh`: `/usr/bin/material-boot`, `/usr/share/material-boot/{lib,scripts,assets,plugins.d}`. The shared **data is not in the package**: it depends on the scheme, so it is built on the machine by the package's own scriptlet (`material-boot core install --from-package --only core --yes`, after an install and an upgrade; never failing the transaction), and `--uninstall` in package mode removes only what was generated there (the data and the bytecode caches Python wrote next to the package's files). Requirements: Python 3.9, Pillow, `rsvg-convert`. A part's package puts its manifest in `plugins.d` (which the core's package owns) and requires the core at the same major.
+
+`tests/containers/build_pkg.sh` and `pkg_smoke.sh` build each package in a distro container and exercise it: install, the command, a part that plugs in, a changed scheme, an upgrade (settings and a part's manifest survive), a data build that cannot run, and removal (nothing left behind). Run for all three formats (Fedora, Debian, Arch) in the CI job `packages`.
+

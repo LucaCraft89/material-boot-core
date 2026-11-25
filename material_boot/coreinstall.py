@@ -248,6 +248,16 @@ def hook_verify(ctx):
 
 def hook_uninstall(ctx):
     p = prefix(ctx.root)
+    if ctx.how == "package":
+        # the package manager removes the files it owns; what it does not know is what was generated here
+        for d in ("data", "data.new", "data.old"):
+            shutil.rmtree(p / d, ignore_errors=True)
+        # python wrote bytecode caches next to the package's modules when root ran the command; the package manager does not own them, so it could not
+        # remove the directories that hold them
+        for d in (p / "lib", p / "scripts"):
+            for cache in list(d.rglob("__pycache__")):
+                shutil.rmtree(cache, ignore_errors=True)
+        return {"changed": True}
     for f in (shim_path(ctx.root),):
         try:
             f.unlink()

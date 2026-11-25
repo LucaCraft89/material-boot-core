@@ -541,6 +541,10 @@ def usage():
 
 def main(argv, say=print, ask=None):
     """`material-boot core install ...`. Returns the exit status."""
+    if "--uninstall" in argv:
+        sys.dont_write_bytecode = (
+            True  # a removal must not leave new caches next to the files the package manager is about to delete
+        )
     bundle = None
     for i, a in enumerate(argv):
         if a == "--bundle" and i + 1 < len(argv):
