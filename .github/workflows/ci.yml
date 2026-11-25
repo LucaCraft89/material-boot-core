@@ -115,3 +115,28 @@ jobs:
         if: always()
         with: {name: "package-${{ matrix.fmt }}", path: build/out/}
 
+
+  bundle:
+    # The whole unified installer, for real: a bundle made of this core and the REAL parts (material-grub, material-plymouth, from the refs below), installed in a
+    # Fedora container with a fake /boot: a dry run changes nothing; GRUB is installed (the default part), then Plymouth (a real dracut rebuild, checked);
+    # doctor has a section per part; both are removed again (grub.cfg and the initramfs as before) and the core stays. Software only, no VM.
+    name: The bundle with the real parts (Fedora)
+    runs-on: ubuntu-latest
+    env:
+      PART_GRUB_REF: ${{ vars.PART_GRUB_REF || 'feat/upgrade-matrix' }}
+      PART_PLYMOUTH_REF: ${{ vars.PART_PLYMOUTH_REF || 'feat/packages-core' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: {repository: LucaCraft89/material-grub, ref: "${{ env.PART_GRUB_REF }}", path: parts-grub}
+      - uses: actions/checkout@v4
+        with: {repository: LucaCraft89/material-plymouth, ref: "${{ env.PART_PLYMOUTH_REF }}", path: parts-plymouth}
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil librsvg2-bin
+      - run: python3 scripts/build_bundle.py --out build/bundle --part grub=parts-grub --part plymouth=parts-plymouth
+      - run: |
+          mkdir -p build/out
+          docker run --rm -v "$PWD/build/bundle/material-boot-$(cat VERSION):/bundle:ro" -v "$PWD:/src:ro" -v "$PWD/build/out:/out" registry.fedoraproject.org/fedora:latest sh /src/tests/containers/bundle_smoke.sh
+      - run: cat build/out/bundle-smoke.txt; grep -q "^ALL OK" build/out/bundle-smoke.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: "bundle-smoke", path: build/out/}
