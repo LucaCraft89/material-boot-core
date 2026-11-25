@@ -26,6 +26,7 @@ PARTIAL = {
         ("titles", ["load_rules", "key_for", "uid", "parse_title", "kind_of"]),
         ("catalog", ["GENERIC"]),
     ],
+    "installer": [("events", ["LineEvents", "Tee", "open_log"])],
     "mgdetect": [
         (
             "state",
@@ -33,6 +34,11 @@ PARTIAL = {
         ),
     ],
 }
+
+
+# Modules that do not live in install/bin: name -> the directory, relative to install/bin. They are covered when the whole checkout is there (the suites gate)
+# and skipped when only bin/ was copied (the picture snapshot).
+ELSEWHERE = {"installer": ".."}
 
 
 def describe():
@@ -65,6 +71,14 @@ def rebuilt(source, moves):
     return ast.unparse(ast.fix_missing_locations(tree)) + "\n"
 
 
+def location(bindir, name):
+    """The file of material-grub module `name`, or None when it is an ELSEWHERE module that is not part of this copy."""
+    f = Path(bindir) / ELSEWHERE.get(name, ".") / f"{name}.py"
+    if name in ELSEWHERE and not f.is_file():
+        return None
+    return f
+
+
 def check_gate(new):
     """Every moved module is a shim, and every moved definition of a partial module is imported, not defined (a gate that silently runs the old code
     would pass everything)."""
@@ -72,7 +86,10 @@ def check_gate(new):
         if f"material_boot import {mod}" not in (new / f"{old}.py").read_text():
             raise SystemExit(f"gate error: {old}.py is not a shim for material_boot.{mod}")
     for old, moves in PARTIAL.items():
-        tree = ast.parse((new / f"{old}.py").read_text())
+        f = location(new, old)
+        if f is None:
+            continue
+        tree = ast.parse(f.read_text())
         imported = {a.name for n in tree.body if isinstance(n, ast.ImportFrom) for a in n.names}
         defined = {n.name for n in tree.body if isinstance(n, (ast.FunctionDef, ast.ClassDef))}
         for _mod, names in moves:
@@ -89,5 +106,7 @@ def apply_moves(bindir):
             f"import sys\nfrom material_boot import {mod}\n\nsys.modules[__name__] = {mod}\n"
         )
     for old, moves in PARTIAL.items():
-        (bindir / f"{old}.py").write_text(rebuilt((bindir / f"{old}.py").read_text(), moves))
+        f = location(bindir, old)
+        if f is not None:
+            f.write_text(rebuilt(f.read_text(), moves))
     check_gate(bindir)

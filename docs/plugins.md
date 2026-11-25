@@ -34,12 +34,12 @@ One JSON file per part in a plugin directory: `/usr/share/material-boot/plugins.
 | `name` | yes | The module: `material-boot <name> ...`. 2 to 20 characters: a letter, then lowercase letters, digits or `-`. `core`, `help`, `version` and `menu` are the core's own and cannot be taken. |
 | `core_api` | yes | Must equal the core's `CORE_API` (2). A part for another API is **not run**; the message says "update whichever of the two is older". The number changes only for a breaking change; new optional manifest keys do not change it, and unknown keys are ignored. |
 | `core_min` | no | The oldest `material-boot-core` the part works with (`1.0.0`). An older core makes the part unusable: "update the core". |
-| `entry` | yes | Absolute path of a Python file (see below). If it is missing, the part is reported as half-removed. |
+| `entry` | yes | Path of a Python file (see below), absolute in an installed manifest, **or relative to the manifest's directory** (a bundle's manifest cannot know where it will be unpacked). If it is missing, the part is reported as half-removed. |
 | `title`, `version`, `summary` | no | For `help`, `version` and `doctor`. |
 | `commands` | no | `{command: one line}`. For `help`, the menu and error messages ("unknown command, try: ..."); the part still parses its own arguments. |
 | `menu` | no | `[title, description, [words]]` entries of the `material-boot` menu. The first word must be the part's own name: a part cannot add a menu entry that runs another part (it is ignored, with a warning). |
 | `conf` | no | The keys of `/etc/material-grub.conf` the part owns, so `core conf`, presets and the GUI can show and validate them. The file keeps its historical name and path. |
-| `install` | no | For the unified installer: `default` (installed when the user chooses nothing; false for everything that rebuilds the initramfs) and `needs` (other parts that must be usable; `core` is implied). |
+| `install` | no | For the unified installer ([installer.md](installer.md)): `default` (installed on a fresh system when the user chooses nothing; false for everything that rebuilds the initramfs), `needs` (other parts that must be usable; `core` is implied), `package` (the package that provides the part, for the notice and the "update it with your package manager" command), `layouts` (`normal`, `immutable`: the layouts it supports; the installer refuses the others with a sentence) and `options` (`[{name, takes: "flag"|"value", summary}]`: the part's own install options, accepted as `--<part>-<name>`, and as `--<name>` when only one chosen part declares it). |
 | `hooks` | no | Which of the optional installer and `doctor` hooks the entry file defines. |
 
 Problems never take the core down: a broken, incompatible or unsatisfied part is a sentence in `doctor` and `help`; the rest keeps working. Things that were ignored (a malformed command, a menu entry for another part, an unknown hook) are warnings.

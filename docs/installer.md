@@ -1,6 +1,6 @@
 # The unified installer (design)
 
-**Status: design, nothing here is implemented yet.** It is written before the code because it holds decisions that are the maintainer's; the ones I would like confirmed are marked **Decision**. The contract between the installer and a part is the hooks of [plugins.md](plugins.md) (provisional until this is built); the state record and the migration runner it uses are `material_boot/state.py` and `material_boot/migrate.py`.
+**Status: the framework is implemented** (`material_boot/installer.py`, `detect.py`, `events.py`, tested with fake parts in `tests/test_installer.py`); the bundle builder and the packages are not (C5b, C5c). The decisions below were confirmed by the maintainer: part options as `--<part>-<name>` and bare when unambiguous, no cross-part rollback, package scriptlets calling `material-boot core install --from-package --only <part>`, and the default part set from `install.default`. The contract between the installer and a part is the hooks of [plugins.md](plugins.md) (provisional until this is built); the state record and the migration runner it uses are `material_boot/state.py` and `material_boot/migrate.py`.
 
 ## What exists today (material-grub 0.8 / 1.0)
 
@@ -63,9 +63,9 @@ All-or-nothing across parts would mean uninstalling a working GRUB theme because
 
 Each package ships its part's sources and installs its manifest. **Decision (scriptlets):** a part's scriptlet calls `material-boot core install --from-package --only <part> --yes`, so a package upgrade and a source install go through the same code (detection, notice, migrations, hooks). material-grub's packages keep calling `install.sh --from-package` until G3 switches them; the core package requires nothing from the parts, and a part requires the core at the same major. A part is never installed by the core's package.
 
-## Tests (planned with the code)
+## Tests
 
-- The framework with **fake parts** (a manifest, an entry file, hooks that record what they were asked): selection rules, `needs`, `--with/--without/--only`, option routing and ambiguity, dry-run changes nothing, failure in the middle (first part kept, second rolled back by itself, third not run), uninstall order, the state record after each part, the JSON event stream against a recorded one.
+- The framework with **fake parts** (done: 40 tests, and seven deliberate breakages of the installer each fail them) (a manifest, an entry file, hooks that record what they were asked): selection rules, `needs`, `--with/--without/--only`, option routing and ambiguity, dry-run changes nothing, failure in the middle (first part kept, second rolled back by itself, third not run), uninstall order, the state record after each part, the JSON event stream against a recorded one.
 - A **staged tree** (`--root`) install of the real parts once they register (G2, P2): the matrix of the plan's section 10 (grub only, plymouth only, both, none of the optional parts; upgrade from 0.7.x; uninstall each part).
 - material-grub's own installer suites keep running against the GRUB part (the gate in `tests/gate`).
 

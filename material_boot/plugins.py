@@ -17,7 +17,8 @@ reported (`doctor`, `help`) and the rest keeps working. The contract, in prose, 
       "commands": {"apply": "render the theme and rebuild the initramfs", "status": "what is installed"},
       "menu": [["Apply the Plymouth theme", "Render it and rebuild the initramfs", ["plymouth", "apply"]]],
       "conf": ["PLYMOUTH", "PLYMOUTH_BAR", "PLYMOUTH_MOTION"],   # the keys of /etc/material-grub.conf this part owns
-      "install": {"default": false, "needs": ["grub"]},           # for the unified installer
+      "install": {"default": false, "needs": ["grub"], "package": "material-plymouth", "layouts": ["normal"],
+                  "options": [{"name": "no-cmdline", "takes": "flag", "summary": "never edit the kernel command line"}]},  # for the installer
       "hooks": ["detect", "install", "uninstall", "migrate", "verify", "doctor"]   # the optional hook_<name>(ctx) functions the entry file defines
     }
 
@@ -39,6 +40,7 @@ MANIFEST = 2
 NAME = re.compile(r"^[a-z][a-z0-9-]{1,19}$")
 COMMAND = re.compile(r"^[a-z][a-z0-9-]{0,29}$")
 CONF_KEY = re.compile(r"^[A-Z][A-Z0-9_]{1,39}$")
+OPTION = re.compile(r"^[a-z][a-z0-9-]{0,29}$")
 # Words that are the core's own: the built-in module and the top-level commands. A part cannot take them over.
 RESERVED = frozenset({"core", "help", "version", "menu"})
 # The hooks the unified installer and `doctor` may call, each as a function `hook_<name>(ctx)` in the part's entry file.
@@ -96,6 +98,10 @@ def read_manifest(path, core_version=None):
         hooks=(),
         default=False,
         needs=[],
+        options=[],
+        layouts=[],
+        package=None,
+        source=None,
         core_min=None,
         path=path,
         problem=None,
@@ -142,10 +148,15 @@ def read_manifest(path, core_version=None):
         if have is not None and have < need:
             p.problem = f"{name} {p.version} needs material-boot-core {m['core_min']} or newer, this is {core_version}: update the core"
             return p
-    if not isinstance(m.get("entry"), str) or not os.path.isabs(m["entry"]) or not Path(m["entry"]).is_file():
+    entry = m.get("entry")
+    if isinstance(entry, str) and entry and not os.path.isabs(entry):
+        entry = str(
+            path.resolve().parent / entry
+        )  # a bundle's manifest cannot know where it will be unpacked: relative to the manifest
+    if not isinstance(entry, str) or not entry or not Path(entry).is_file():
         p.problem = f"{name}: its entry file {m.get('entry')!r} is missing (is the package half removed?)"
         return p
-    p.entry = m["entry"]
+    p.entry = entry
     cmds = m.get("commands", {})
     if isinstance(cmds, dict):
         for c, text in cmds.items():
@@ -167,6 +178,20 @@ def read_manifest(path, core_version=None):
         p.warnings.append(f"{name}: unknown hooks were ignored (known: {', '.join(HOOKS)})")
     inst = m.get("install") if isinstance(m.get("install"), dict) else {}
     p.default = inst.get("default") is True
+    p.package = inst.get("package") if isinstance(inst.get("package"), str) else None
+    layouts = inst.get("layouts", [])
+    p.layouts = [x for x in layouts if x in ("normal", "immutable")] if isinstance(layouts, list) else []
+    for o in inst.get("options", []) if isinstance(inst.get("options"), list) else []:
+        if isinstance(o, dict) and isinstance(o.get("name"), str) and OPTION.match(o["name"]):
+            p.options.append(
+                {
+                    "name": o["name"],
+                    "takes": "value" if o.get("takes") == "value" else "flag",
+                    "summary": str(o.get("summary", ""))[:200],
+                }
+            )
+        else:
+            p.warnings.append(f"{name}: an install option is malformed and was ignored")
     needs = inst.get("needs", [])
     if isinstance(needs, list) and all(isinstance(n, str) and (n == "core" or NAME.match(n)) for n in needs):
         p.needs = [
@@ -193,6 +218,21 @@ def discover(dirs=None, core_version=None):
             else:
                 found[rec.name] = rec
     return resolve([found[k] for k in sorted(found)])
+
+
+def discover_bundle(bundle, core_version=None):
+    """The parts a bundle (see docs/installer.md) carries, usable or not: parts/<name>/manifest.json, with `entry` relative to the manifest. They are not
+    installed yet, so no plugin directory knows them. Each record's `source` is the part's directory in the bundle."""
+    found = []
+    try:
+        files = sorted(Path(bundle).glob("parts/*/manifest.json"))
+    except OSError:
+        files = []
+    for f in files:
+        rec = read_manifest(f, core_version)
+        rec.source = f.parent
+        found.append(rec)
+    return resolve(found)
 
 
 def resolve(parts):

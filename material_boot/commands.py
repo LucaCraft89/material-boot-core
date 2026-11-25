@@ -7,6 +7,7 @@
     apply [--only PART]       run the `apply` command of every installed part that has one
     doctor                    the state of the core and of every part (and each part's own checks)
     parts                     which parts are installed, and why one cannot be used
+    install ...               install, update or remove parts (material_boot/installer.py, docs/installer.md)
 
 `conf`, `colour`, `presets` and `overrides` are the commands of material-grub's `material-grub` that only ever needed the shared code; the bodies are the same
 (only the program name in the messages changed, and "apply" now means every installed part). `update`, `uninstall` and `gui` come with the code they need.
@@ -195,6 +196,14 @@ def c_overrides(argv):
 
 
 # ---------------------------------------------------------------- parts, apply, doctor
+def c_install(argv):
+    from . import installer
+
+    if not ({"--dry-run", "--root", "-h", "--help"} & set(argv) or any(a.startswith("--root=") for a in argv)):
+        elevate(["core", "install", *argv], [os.environ.get("MATERIAL_CONF", "/etc/material-grub.conf")])
+    return installer.main(argv, say=say)
+
+
 def c_parts(argv):
     found = plugins.discover()
     if not found:
@@ -279,6 +288,7 @@ COMMANDS = {
     "overrides": (c_overrides, "colours, names and icons per entry: show | check | path | edit"),
     "apply": (c_apply, "apply the look: the `apply` of every installed part"),
     "doctor": (c_doctor, "the state of the core and of every part"),
+    "install": (c_install, "install, update or remove parts: --with, --without, --only, --dry-run, --uninstall"),
     "parts": (c_parts, "which parts are installed, and why one cannot be used"),
 }
 ALIASES = {"color": "colour", "seed": "colour", "preset": "presets", "config": "conf", "status": "doctor"}

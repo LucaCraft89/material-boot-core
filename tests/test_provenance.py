@@ -32,6 +32,7 @@ PROVENANCE = [
         "install/bin/mgdetect.py",
         ["STATE_VERSION", "version_tuple", "_state_dir", "state_path", "read", "write", "record", "owner_of"],
     ),
+    ("material_boot/events.py", "install/installer.py", ["LineEvents", "Tee", "open_log"]),
     (
         "material_boot/presets.py",
         "install/bin/mgpresets.py",
