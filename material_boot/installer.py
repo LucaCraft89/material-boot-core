@@ -274,6 +274,11 @@ class Installer:
 
     def ctx(self, part=None, dry=None):
         o = self.o
+        installed = Path(self.root or "/") / "usr/share/material-boot/data"
+        if (
+            installed.is_dir()
+        ):  # the shared data the core part has built (or built earlier): a part's hook reads it through core.data
+            self.core.data = installed
         return plugins.make_ctx(
             core=self.core,
             root=self.root,

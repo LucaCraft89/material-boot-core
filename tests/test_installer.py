@@ -38,7 +38,7 @@ def hook_plan(ctx):
     return CFG.get("plan", ["would install " + CFG["name"]])
 
 def hook_install(ctx):
-    _log("install", style=ctx.conf.get("STYLE"), options=ctx.options, dry=ctx.dry_run, root=ctx.root, previous=ctx.previous, json=ctx.json)
+    _log("install", style=ctx.conf.get("STYLE"), options=ctx.options, dry=ctx.dry_run, root=ctx.root, previous=ctx.previous, json=ctx.json, data=str(ctx.core.data))
     if CFG.get("fail"):
         raise RuntimeError(CFG["fail"])
     if CFG.get("state_entry"):
@@ -362,6 +362,16 @@ class Run(Base):
         self.assertIn("Installed: core, aaa. Failed: bbb. Not run: ccc.", out)
         self.assertIn("RuntimeError: disk full", out)
         self.assertIn("Run again to retry the rest.", out)
+
+    def test_a_part_reads_the_shared_data_the_run_has_installed(self):
+        self.part("aaa", install={"default": True})
+        data = self.rootdir / "usr/share/material-boot/data"
+        data.mkdir(parents=True)
+        rc, _ = self.run_cli("--yes")
+        self.assertEqual(rc, 0)
+        self.assertEqual(
+            [c["data"] for c in self.calls() if c["hook"] == "install" and c["part"] == "aaa"], [str(data)]
+        )
 
     def test_a_part_is_told_when_stdout_is_the_event_stream(self):
         self.part("aaa", install={"default": True})
