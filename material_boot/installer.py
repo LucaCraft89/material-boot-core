@@ -291,6 +291,7 @@ class Installer:
             target_version=part.version if part else __version__,
             how=self.how,
             source=self.o.bundle,
+            json=bool(o.json),
         )
 
     # -- the stages

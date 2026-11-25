@@ -79,7 +79,7 @@ def hook_install(ctx): ...  # one function per hook the manifest lists, named ho
 
 Called by the unified installer, `doctor` and the upgrade machinery, each as `hook_<name>(ctx)`. A hook that crashes is a failed step (reported and rolled back), never an exception that takes the installer down; a part without a hook is simply skipped.
 
-`ctx` carries `core`, `root` (a staged tree for tests and packaging; empty for the real system), `dry_run`, `yes`, `progress(event)` (the `--progress json` stream), `options` (the part's own installer choices), `conf`, `backup_dir`, `previous` (what the state record says about this part, or `None`) and `target_version`.
+`ctx` carries `core`, `root` (a staged tree for tests and packaging; empty for the real system), `dry_run`, `yes`, `progress(event)` (the `--progress json` stream), `options` (the part's own installer choices), `conf`, `backup_dir`, `previous` (what the state record says about this part, or `None`), `target_version`, `how` (`source`, `package`, `immutable`), `source` (the bundle directory, or `None`) and `json` (a `--progress json` run: stdout is the event stream, so a part that runs a program of its own relays that program's events through `progress` instead of printing).
 
 | Hook | Returns |
 |---|---|

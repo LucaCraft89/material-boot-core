@@ -38,7 +38,7 @@ def hook_plan(ctx):
     return CFG.get("plan", ["would install " + CFG["name"]])
 
 def hook_install(ctx):
-    _log("install", style=ctx.conf.get("STYLE"), options=ctx.options, dry=ctx.dry_run, root=ctx.root, previous=ctx.previous)
+    _log("install", style=ctx.conf.get("STYLE"), options=ctx.options, dry=ctx.dry_run, root=ctx.root, previous=ctx.previous, json=ctx.json)
     if CFG.get("fail"):
         raise RuntimeError(CFG["fail"])
     if CFG.get("state_entry"):
@@ -362,6 +362,15 @@ class Run(Base):
         self.assertIn("Installed: core, aaa. Failed: bbb. Not run: ccc.", out)
         self.assertIn("RuntimeError: disk full", out)
         self.assertIn("Run again to retry the rest.", out)
+
+    def test_a_part_is_told_when_stdout_is_the_event_stream(self):
+        self.part("aaa", install={"default": True})
+        for argv, want in (([], False), (["--progress", "json"], True)):
+            self.log.unlink(missing_ok=True)
+            with mock.patch("sys.__stdout__", io.StringIO()):
+                rc, _ = self.run_cli("--yes", *argv)
+            self.assertEqual(rc, 0)
+            self.assertEqual([c["json"] for c in self.calls() if c["hook"] == "install" and c["part"] == "aaa"], [want])
 
     def test_a_part_that_fails_its_verify_is_a_failure(self):
         self.part("aaa", install={"default": True}, problems=["the theme is missing"])
