@@ -87,3 +87,28 @@ jobs:
         run: python -m unittest -v tests.test_panel tests.test_custom
         env:
           MATERIAL_PKG: ${{ runner.temp }}/pkg-dark
+
+  packages:
+    # The three package formats of the core: build each from the checked-out tree, install it in a distro container (the dependencies come from the package's
+    # own requirements, the shared data is built on install), use the command, change the scheme, upgrade, break the data build on purpose (the package manager
+    # must still succeed and the old data stays), and remove it (nothing generated is left behind).
+    name: Package ${{ matrix.fmt }} (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {fmt: rpm,  name: Fedora, image: "registry.fedoraproject.org/fedora:latest"}
+          - {fmt: deb,  name: Debian, image: "docker.io/library/debian:stable"}
+          - {fmt: arch, name: Arch,   image: "docker.io/library/archlinux:latest"}
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p build/pkg build/out
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/pkg:/out" "${{ matrix.image }}" sh /src/tests/containers/build_pkg.sh ${{ matrix.fmt }}
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/pkg:/pkg:ro" -v "$PWD/build/out:/out" "${{ matrix.image }}" sh /src/tests/containers/pkg_smoke.sh ${{ matrix.fmt }}
+      - run: cat build/out/pkg-${{ matrix.fmt }}.txt; grep -q "^ALL OK" build/out/pkg-${{ matrix.fmt }}.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: "package-${{ matrix.fmt }}", path: build/out/}
+

@@ -167,6 +167,25 @@ class Changes(unittest.TestCase):
         self.assertFalse(ci.shim_path(self.root).exists())
         self.assertTrue((self.p / "plugins.d/plymouth.json").is_file())
 
+    def test_a_package_removal_deletes_only_what_was_generated(self):
+        # the package manager owns the files; a leftover data directory would stay behind if the hook did not remove it
+        (self.p / "data.old").mkdir()
+        r = ci.hook_uninstall(ctx(self.root, None, how="package"))
+        self.assertTrue(r["changed"])
+        for d in ("data", "data.old"):
+            self.assertFalse((self.p / d).exists(), d)
+        for d in ci.COPIED:
+            self.assertTrue((self.p / d).is_dir(), f"{d} belongs to the package manager, not to the hook")
+        self.assertTrue(ci.shim_path(self.root).is_file())
+
+    def test_a_package_removal_also_removes_the_bytecode_caches_python_wrote(self):
+        for d in ("lib/material_boot/__pycache__", "scripts/__pycache__"):
+            (self.p / d).mkdir(exist_ok=True)  # the data build already left some, importing the installed library
+            (self.p / d / "x.cpython-313.pyc").write_bytes(b"\0")
+        ci.hook_uninstall(ctx(self.root, None, how="package"))
+        self.assertFalse(list(self.p.rglob("__pycache__")))
+        self.assertTrue((self.p / "lib/material_boot/__init__.py").is_file())  # the package's own files stay
+
     def test_uninstall_removes_the_prefix_when_nothing_else_is_left(self):
         ci.hook_uninstall(ctx(self.root, self.bundle))
         self.assertFalse(self.p.exists())

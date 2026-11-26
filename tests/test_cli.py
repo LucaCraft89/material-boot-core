@@ -399,6 +399,17 @@ class Shim(Base):
         self.assertEqual(self.run_shim("plymouth", "x").returncode, 5)
         self.assertEqual(self.run_shim("nope").returncode, 2)
 
+    def test_a_python_that_is_too_old_gets_a_clear_message(self):
+        old = self.d / "python-old"
+        old.write_text("#!/bin/sh\nexit 1\n")  # what `python -c 'sys.exit(version >= 3.9 ...)'` does on a 3.8
+        old.chmod(0o755)
+        env = dict(os.environ, MATERIAL_PY=str(old))
+        r = subprocess.run(
+            ["sh", str(ROOT / "bin/material-boot"), "version"], capture_output=True, text=True, env=env, cwd=self.d
+        )
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("Python 3.9 or newer is needed", r.stderr)
+
     def test_python_dash_m_works_too(self):
         r = subprocess.run(
             [sys.executable, "-m", "material_boot", "version"],

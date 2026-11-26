@@ -547,6 +547,18 @@ class TheCore(Base):
         self.assertNotIn("core", state.read(str(self.rootdir))["parts"])
 
 
+class Removal(Base):
+    def test_an_uninstall_stops_python_writing_new_bytecode(self):
+        self.part("grub", install={"default": True})
+        before = sys.dont_write_bytecode
+        try:
+            sys.dont_write_bytecode = False
+            self.run_cli("--yes", "--uninstall")
+            self.assertTrue(sys.dont_write_bytecode)
+        finally:
+            sys.dont_write_bytecode = before
+
+
 class Events(Base):
     def test_the_progress_stream_has_the_names_the_gui_parses(self):
         self.part("grub", install={"default": True}, detect={"found": True, "version": "0.7.1", "how": "source"})
