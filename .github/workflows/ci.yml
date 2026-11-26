@@ -32,11 +32,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "${{ matrix.python }}"}
+      - run: pip install pillow    # the renderer needs it; the pure modules are tested without it in a subprocess (tests/test_skeleton.py)
       - run: python -m unittest discover -s tests -v
 
   snapshot:
     # The render snapshot (tests/snapshot): material-grub's own scenes, rendered by the real commands, must hash exactly as tests/snapshot/golden.json says.
-    # Until a module moves here this proves the golden is reproducible on another machine; from the first move on it is the "no pixel changed" gate.
+    # The baseline run proves the golden is reproducible on another machine; the --core run is the "no pixel changed" gate for every module that moved here.
     name: Render snapshot (identical pixels)
     runs-on: ubuntu-24.04
     env:
@@ -59,6 +60,15 @@ jobs:
           mv dist/material-grub "$RUNNER_TEMP/pkg-dark"
           python scripts/package.py --res 1920x1080 --scheme light
           mv dist/material-grub "$RUNNER_TEMP/pkg-light"
-      - run: >
+      - name: The golden reproduces from material-grub's own modules (baseline)
+        run: >
           python tests/snapshot/snapshot.py --bin material-grub/install/bin
           --pkg-dark "$RUNNER_TEMP/pkg-dark" --pkg-light "$RUNNER_TEMP/pkg-light"
+      - name: The golden reproduces with this repository's modules (the gate for every move)
+        run: >
+          python tests/snapshot/snapshot.py --core --bin material-grub/install/bin
+          --pkg-dark "$RUNNER_TEMP/pkg-dark" --pkg-light "$RUNNER_TEMP/pkg-light"
+      - name: Renderer tests that need a built package
+        run: python -m unittest -v tests.test_panel tests.test_custom
+        env:
+          MATERIAL_PKG: ${{ runner.temp }}/pkg-dark

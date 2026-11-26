@@ -9,7 +9,10 @@ every pull request that moves code runs this again and must reproduce it exactly
 
   --bin       material-grub's install/bin (a checkout) or <package>/bin
   --pkg-dark  a built package (scripts/package.py --res 1920x1080), --pkg-light the same built with --scheme light
-  --path      extra directories put on PYTHONPATH (the core's library, once the modules live there)
+  --path      extra directories put on PYTHONPATH
+  --core      THE GATE for a move: use this repository's modules instead of material-grub's own. A temporary copy of --bin is made with the moved modules
+              (MOVED below) replaced by one-line shims that hand out the material_boot module, which is exactly what material-grub's own switch-over
+              does. The result must equal golden.json.
   --update    write golden.json instead of comparing
 
 Needs Pillow. Takes a few minutes: it is a matrix of real renders.
@@ -26,6 +29,15 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 GOLDEN = HERE / "golden.json"
+ROOT = HERE.parent.parent
+# material-grub module -> the material_boot module that replaces it. Grow this list with every module that moves; the gate then covers it.
+MOVED = {
+    "mgoverrides": "overrides",
+    "mgseeds": "seeds",
+    "mgpalette": "palette",
+    "mgscenes": "scenes",
+    "mgcustom": "custom",
+}
 STYLES = ("rail", "clean", "list", "split")
 CFGS = ("fedora", "ubuntu")
 OVERRIDES = {
@@ -146,6 +158,18 @@ def render(case, bindir, pkg, paths):
         shutil.rmtree(d, ignore_errors=True)
 
 
+def with_core(bindir):
+    """A copy of material-grub's bin directory where every moved module is a shim for the core's. Returns (new dir, temp dir to delete)."""
+    tmp = Path(tempfile.mkdtemp(prefix="snap-bin-"))
+    new = tmp / "bin"
+    shutil.copytree(bindir, new, ignore=shutil.ignore_patterns("__pycache__", "materialyoucolor"))
+    for old, mod in MOVED.items():
+        (new / f"{old}.py").write_text(
+            f"import sys\nfrom material_boot import {mod}\n\nsys.modules[__name__] = {mod}\n"
+        )
+    return new, tmp
+
+
 def main(argv):
     def opt(n, many=False):
         v = [argv[i + 1] for i, a in enumerate(argv) if a == n]
@@ -155,7 +179,13 @@ def main(argv):
     if not (bindir and dark and light):
         raise SystemExit(__doc__)
     bindir = Path(bindir)
-    paths = [bindir, *map(Path, opt("--path", many=True))]
+    paths = [*map(Path, opt("--path", many=True))]
+    tmp = None
+    if "--core" in argv:
+        bindir, tmp = with_core(bindir)
+        paths.append(ROOT)
+        print(f"using the core's {', '.join(MOVED.values())} (shims in {bindir})")
+    paths.insert(0, bindir)
     only = opt("--only")
     got = {}
     for case in cases():
@@ -165,7 +195,11 @@ def main(argv):
         got[case[0]] = render(case, bindir, Path(dark if case[2] == "dark" else light), paths)
     import PIL
 
+    if tmp:
+        shutil.rmtree(tmp, ignore_errors=True)
     if "--update" in argv:
+        if "--core" in argv:
+            raise SystemExit("--update takes the golden from material-grub's own modules, never from the core")
         got["_meta"] = {
             "pillow": PIL.__version__,
             "source": "material-grub release/0.8.0 (29315f7), packages built with scripts/package.py",

@@ -1,4 +1,5 @@
 import re
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -25,10 +26,14 @@ class Skeleton(unittest.TestCase):
         self.assertEqual(material_boot.CORE_API, 2)
 
     def test_imports_with_nothing_installed(self):
-        # the core must import on a bare system: Pillow and friends are imported by the modules that need them, never by the package itself
-        from material_boot import overrides, palette, seeds  # noqa: F401  (the pure modules: stdlib only)
-
-        self.assertNotIn("PIL", sys.modules)
+        # the core must import on a bare system: Pillow is imported by the modules that draw (scenes, custom), never by the package or the pure
+        # modules. Checked in a fresh interpreter, so the order of the tests (some of which import Pillow) cannot matter.
+        code = (
+            "import sys; import material_boot; from material_boot import overrides, palette, seeds; "
+            "sys.exit(1 if 'PIL' in sys.modules else 0)"
+        )
+        r = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
 
 if __name__ == "__main__":
