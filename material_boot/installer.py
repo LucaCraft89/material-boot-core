@@ -274,6 +274,11 @@ class Installer:
 
     def ctx(self, part=None, dry=None):
         o = self.o
+        installed = Path(self.root or "/") / "usr/share/material-boot/data"
+        if (
+            installed.is_dir()
+        ):  # the shared data the core part has built (or built earlier): a part's hook reads it through core.data
+            self.core.data = installed
         return plugins.make_ctx(
             core=self.core,
             root=self.root,
@@ -291,6 +296,7 @@ class Installer:
             target_version=part.version if part else __version__,
             how=self.how,
             source=self.o.bundle,
+            json=bool(o.json),
         )
 
     # -- the stages
@@ -444,7 +450,10 @@ class Installer:
                     self.results.append((p.name, "failed", "; ".join(map(str, problems))))
                     self.results += [(q.name, "not run", "") for q in self.parts[idx + 1 :]]
                     return False
-            self.record(p)
+            if value.get(
+                "record", True
+            ):  # a part that only built something (stage-only) says so: it must not be recorded as installed
+                self.record(p)
             self.results.append((p.name, "installed" if value.get("changed", True) else "unchanged", ""))
             self.emit("ok", text=f"{p.title} {p.version} installed", part=p.name)
         return True

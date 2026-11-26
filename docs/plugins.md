@@ -79,13 +79,13 @@ def hook_install(ctx): ...  # one function per hook the manifest lists, named ho
 
 Called by the unified installer, `doctor` and the upgrade machinery, each as `hook_<name>(ctx)`. A hook that crashes is a failed step (reported and rolled back), never an exception that takes the installer down; a part without a hook is simply skipped.
 
-`ctx` carries `core`, `root` (a staged tree for tests and packaging; empty for the real system), `dry_run`, `yes`, `progress(event)` (the `--progress json` stream), `options` (the part's own installer choices), `conf`, `backup_dir`, `previous` (what the state record says about this part, or `None`) and `target_version`.
+`ctx` carries `core`, `root` (a staged tree for tests and packaging; empty for the real system), `dry_run`, `yes`, `progress(event)` (the `--progress json` stream), `options` (the part's own installer choices), `conf`, `backup_dir`, `previous` (what the state record says about this part, or `None`), `target_version`, `how` (`source`, `package`, `immutable`), `source` (the bundle directory, or `None`) and `json` (a `--progress json` run: stdout is the event stream, so a part that runs a program of its own relays that program's events through `progress` instead of printing).
 
 | Hook | Returns |
 |---|---|
 | `detect` | what is installed: found or not, version, how (`package`, `source`, `immutable`), problems |
 | `plan` | sentences for what `install` would change now (the dry-run) |
-| `install` | `{"changed": bool, "notes": [...]}`; raises on failure; must be idempotent and leave the old install working until the swap |
+| `install` | `{"changed": bool, "notes": [...], "record": bool}` (`record: false`: nothing was installed, so the state record must not say it was; default true); raises on failure; must be idempotent and leave the old install working until the swap |
 | `uninstall` | the same, and must remove only what the part installed |
 | `migrate` | results of the part's ordered, idempotent migration steps for an older install |
 | `verify` | a list of problems (empty when healthy) |
