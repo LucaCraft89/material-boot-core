@@ -40,6 +40,8 @@ Stays in the parts: GRUB scene layouts, resolutions, BLS handling, the `grub.d` 
 
 ## Parts and the plugin API (`CORE_API = 2`)
 
+The contract is [plugins.md](plugins.md); the code is `material_boot/plugins.py`.
+
 GRUB registers exactly like Plymouth, so Plymouth can be installed without GRUB. A manifest in `plugins.d/` lists the part's commands, menu entries, installer options and hooks (`detect`, `plan`, `install`, `uninstall`, `migrate`, `verify`). API 1 was the first draft inside material-grub and was never released, so nothing needs a compatibility layer. A part with another `core_api` is not run; `doctor` says which side to update.
 
 ## The installer
