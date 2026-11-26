@@ -10,7 +10,7 @@ R=/out/bundle-smoke.txt; : > $R
 say() { echo "$*" | tee -a $R; }
 # only behind a TLS-intercepting proxy (a sandbox)
 if [ -n "${MG_CA:-}" ]; then
-  for d in /etc/pki/ca-trust/source/anchors /etc/ca-certificates/trust-source/anchors /usr/local/share/ca-certificates; do
+  for d in /etc/pki/ca-trust/source/anchors /etc/ca-certificates/trust-source/anchors /usr/share/pki/trust/anchors /usr/local/share/ca-certificates; do
     [ -d "$d" ] && { cp "$MG_CA" "$d/mg-ca.crt"; break; }
   done
   update-ca-trust 2>/dev/null || update-ca-certificates >/dev/null 2>&1 || true
@@ -41,6 +41,13 @@ case $ID in
     kver=$(ls /lib/modules | head -n1); mkdir -p /boot/grub /etc/default
     IMG=/boot/initramfs-linux.img; [ -f "$IMG" ] || mkinitcpio -k "$kver" -g "$IMG" >/dev/null 2>&1
     CFG=/boot/grub/grub.cfg; MK=grub-mkconfig; PROBE=/usr/bin/grub-probe; LISTER=lsinitcpio ;;
+  opensuse*)
+    zypper --non-interactive --gpg-auto-import-keys refresh >/dev/null
+    zypper --non-interactive install --no-recommends grub2 rsvg-convert python3 python3-pip python3-Pillow plymouth plymouth-plugin-script plymouth-plugin-label plymouth-plugin-label-ft plymouth-scripts plymouth-dracut dracut findutils kmod kernel-default-base >/dev/null
+    for k in /lib/modules/*; do depmod -a "$(basename "$k")"; done
+    kver=$(ls /lib/modules | head -n1); mkdir -p /boot/grub2 /etc/default
+    IMG="/boot/initrd-$kver"; dracut -f --no-hostonly "$IMG" "$kver" >/dev/null 2>&1
+    CFG=/boot/grub2/grub.cfg; MK=grub2-mkconfig; PROBE=/usr/sbin/grub2-probe; LISTER=lsinitrd ;;
   *) echo "unknown distribution $ID"; exit 1 ;;
 esac
 cp /src/tests/containers/probe "$PROBE" 2>/dev/null || true
