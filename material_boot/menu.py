@@ -7,6 +7,7 @@ import sys
 from . import __version__, plugins
 from . import conf as mgconf
 from . import overrides as mgoverrides
+from . import presets as mgpresets
 from . import seeds as mgseeds
 from .cli import say
 
@@ -15,6 +16,7 @@ CORE_MENU = [
     ("Health check", "Is everything installed and valid?", ["core", "doctor"]),
     ("Apply changes", "Apply the look through every installed part", ["core", "apply"]),
     ("One colour for everything", "Pick a seed colour (or a colour per entry)", ["@colour"]),
+    ("Presets", "Save, apply and delete looks", ["@presets"]),
     ("Settings", "Style, cookie, hints, timeout ...", ["@conf"]),
     ("Parts", "Which parts are installed", ["core", "parts"]),
 ]
@@ -91,6 +93,31 @@ def sub_colour():
     return ["core", "colour", r, "--apply"] if seed_from(r) else (say("not a colour") or None)
 
 
+def sub_presets():
+    from .commands import presets_path
+
+    rows = mgpresets.listing(presets_path())
+    say("presets: " + (", ".join(n for n, _ in rows) if rows else "none yet"))
+    r = ask("[s]ave current as..., [a]pply one, [d]elete one, Enter cancels: ").lower()
+    if r.startswith("s"):
+        n = ask("name: ")
+        return ["core", "presets", "save", n] if n else None
+    if r.startswith(("a", "d")):
+        n = ask("which one: ")
+        return (
+            [
+                "core",
+                "presets",
+                "apply" if r.startswith("a") else "delete",
+                n,
+                *(["--apply"] if r.startswith("a") else []),
+            ]
+            if n
+            else None
+        )
+    return None
+
+
 def sub_conf():
     c = mgconf.load_conf()
     for k, v in c.items():
@@ -99,7 +126,7 @@ def sub_conf():
     return ["core", "conf", r] if "=" in r else None
 
 
-SUBMENUS = {"@colour": sub_colour, "@conf": sub_conf}
+SUBMENUS = {"@colour": sub_colour, "@presets": sub_presets, "@conf": sub_conf}
 
 
 def menu_items():

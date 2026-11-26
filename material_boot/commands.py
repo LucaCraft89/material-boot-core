@@ -2,14 +2,14 @@
 
     conf [KEY=VALUE ...]      show or change the runtime options of /etc/material-grub.conf (shared by every part)
     colour [WHAT]             one seed colour for the whole look (#RRGGBB or a name), or `multi`
+    presets ...               list | save NAME | apply NAME | delete NAME | export NAME FILE | import FILE
     overrides ...             show | check | path | edit   (colours, names and icons per entry)
     apply [--only PART]       run the `apply` command of every installed part that has one
     doctor                    the state of the core and of every part (and each part's own checks)
     parts                     which parts are installed, and why one cannot be used
 
-`conf`, `colour` and `overrides` are the commands of material-grub's `material-grub` that only ever needed the shared code; the bodies are the same
-(only the program name in the messages changed, and "apply" now means every installed part). `presets`, `update`, `uninstall` and `gui` come with the
-code they need.
+`conf`, `colour`, `presets` and `overrides` are the commands of material-grub's `material-grub` that only ever needed the shared code; the bodies are the same
+(only the program name in the messages changed, and "apply" now means every installed part). `update`, `uninstall` and `gui` come with the code they need.
 """
 
 import json
@@ -22,6 +22,7 @@ from pathlib import Path
 from . import CORE_API, __version__, plugins
 from . import conf as mgconf
 from . import overrides as mgoverrides
+from . import presets as mgpresets
 from . import seeds as mgseeds
 from .cli import PROG, elevate, real_core, run, say
 
@@ -88,6 +89,57 @@ def c_colour(argv):
     mgoverrides.save(ov)
     say(f"saved {mgoverrides.path()}")
     return c_apply([]) if apply_now else say(f"apply it with:  sudo {PROG} core apply") or 0
+
+
+def presets_path():
+    return mgoverrides.path()
+
+
+def c_presets(argv):
+    sub = argv[0] if argv else "list"
+    arg = argv[1] if len(argv) > 1 else ""
+    p = presets_path()
+    if sub == "list":
+        rows = mgpresets.listing(p)
+        for n, info in rows:
+            say(f"  {n:<24} style {info['style']}, {info['entries']} customised")
+        if not rows:
+            say(f"no presets yet: {PROG} core presets save NAME")
+        return 0
+    try:
+        if sub == "save":
+            elevate(["core", "presets", *argv], [mgpresets.preset_dir(p) / "x"])
+            say(f"saved {mgpresets.save(arg, p, os.environ.get('MATERIAL_CONF'))}")
+        elif sub == "apply":
+            elevate(["core", "presets", *argv], [p, os.environ.get("MATERIAL_CONF", "/etc/material-grub.conf")])
+            mgpresets.apply(mgpresets.load(arg, p), p, os.environ.get("MATERIAL_CONF"))
+            say(f"preset '{arg}' written. Apply it with: sudo {PROG} core apply")
+            if "--apply" in argv:
+                return c_apply([])
+        elif sub == "delete":
+            elevate(["core", "presets", *argv], [mgpresets.preset_dir(p) / f"{arg}.json"])
+            mgpresets.delete(arg, p)
+            say("deleted")
+        elif sub == "export":
+            Path(argv[2]).write_text(json.dumps(mgpresets.load(arg, p), indent=1) + "\n")
+            say(f"wrote {argv[2]}")
+        elif sub == "import":
+            data = json.loads(Path(arg).read_text())
+            clean, errs = mgpresets.validate(data)
+            if clean is None:
+                say("not a valid preset: " + "; ".join(errs))
+                return 1
+            elevate(["core", "presets", *argv], [mgpresets.preset_dir(p) / "x"])
+            say(f"saved {mgpresets.save(clean['name'], p, data=data)}")
+        else:
+            say(
+                f"usage: {PROG} core presets list | save NAME | apply NAME [--apply] | delete NAME | export NAME FILE | import FILE"
+            )
+            return 2
+    except (ValueError, OSError, IndexError) as e:
+        say(f"{PROG}: {e}")
+        return 1
+    return 0
 
 
 def _readable(p):
@@ -223,12 +275,13 @@ def c_doctor(argv):
 COMMANDS = {
     "conf": (c_conf, "show or change the shared settings (/etc/material-grub.conf)"),
     "colour": (c_colour, "one seed colour for the whole look, or a colour per entry"),
+    "presets": (c_presets, "save, apply and delete looks: list | save | apply | delete | export | import"),
     "overrides": (c_overrides, "colours, names and icons per entry: show | check | path | edit"),
     "apply": (c_apply, "apply the look: the `apply` of every installed part"),
     "doctor": (c_doctor, "the state of the core and of every part"),
     "parts": (c_parts, "which parts are installed, and why one cannot be used"),
 }
-ALIASES = {"color": "colour", "seed": "colour", "config": "conf", "status": "doctor"}
+ALIASES = {"color": "colour", "seed": "colour", "preset": "presets", "config": "conf", "status": "doctor"}
 
 
 def dispatch(argv):

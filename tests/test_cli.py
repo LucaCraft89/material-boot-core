@@ -188,6 +188,50 @@ class CoreCommands(Base):
         self.assertIn("NOT USABLE", out)
 
 
+class Presets(Base):
+    def test_save_list_apply_delete_export_import(self):
+        self.assertIn("no presets yet", self.call("core", "presets")[1])
+        self.call("core", "colour", "#7E57C2")
+        self.call("core", "conf", "STYLE=list")
+        rc, out, _ = self.call("core", "presets", "save", "Gaming rig")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("Gaming rig", self.call("core", "presets", "list")[1])
+        self.call("core", "colour", "multi")
+        self.call("core", "conf", "STYLE=rail")
+        rc, out, _ = self.call("core", "presets", "apply", "Gaming rig")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("material-boot core apply", out)
+        self.assertIn("one seed colour #7E57C2", self.call("core", "colour")[1])
+        self.assertIn("STYLE=list", self.call("core", "conf")[1])
+        dest = self.d / "rig.json"
+        self.assertEqual(self.call("core", "presets", "export", "Gaming rig", str(dest))[0], 0)
+        self.assertEqual(self.call("core", "presets", "delete", "Gaming rig")[0], 0)
+        self.assertIn("no presets yet", self.call("core", "presets", "list")[1])
+        self.assertEqual(self.call("core", "presets", "import", str(dest))[0], 0)
+        self.assertIn("Gaming rig", self.call("core", "presets", "list")[1])
+
+    def test_bad_input(self):
+        self.assertEqual(self.call("core", "presets", "bogus")[0], 2)
+        self.assertEqual(self.call("core", "presets", "apply", "missing")[0], 1)
+        bad = self.d / "bad.json"
+        bad.write_text(json.dumps({"format": 99}))
+        rc, out, _ = self.call("core", "presets", "import", str(bad))
+        self.assertEqual(rc, 1)
+        self.assertIn("not a valid preset", out)
+
+    def test_apply_with_the_flag_runs_the_parts(self):
+        self.part(
+            "plymouth", commands={"apply": "x"}, src="def main(argv, core):\n    print('APPLIED')\n    return 0\n"
+        )
+        self.call("core", "presets", "save", "A")
+        rc, out, _ = self.call("core", "presets", "apply", "A", "--apply")
+        self.assertEqual(rc, 0)
+        self.assertIn("APPLIED", out)
+
+    def test_the_menu_has_a_presets_entry_that_asks_first(self):
+        self.assertIn("Presets", [i[0] for i in menu.menu_items()])
+
+
 class Apply(Base):
     APPLY = "def main(argv, core):\n    print('apply {n}', argv)\n    return {rc}\n"
 
@@ -299,7 +343,9 @@ class Menu(Base):
         with (
             mock.patch("sys.stdin", Tty()),
             mock.patch("sys.stdout", Tty()),
-            mock.patch.object(menu, "pick_plain", side_effect=[3, None]),  # Settings
+            mock.patch.object(
+                menu, "pick_plain", side_effect=[[i[0] for i in menu.menu_items()].index("Settings"), None]
+            ),
             mock.patch.object(menu, "ask", side_effect=["STYLE=list", ""]),
             mock.patch.dict(os.environ, {"TERM": "dumb"}),
         ):
