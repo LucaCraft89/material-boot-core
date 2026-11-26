@@ -13,7 +13,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 import material_boot  # noqa: E402
-from material_boot import cli, detect, installer, plugins, state  # noqa: E402
+from material_boot import cli, coreinstall, detect, installer, plugins, state  # noqa: E402
 
 # One entry file for every fake part: what it does is in cfg.json next to it, and every hook logs the call to $FAKE_LOG.
 ENTRY = """
@@ -61,8 +61,51 @@ def hook_migrate(ctx):
 """
 
 
+class FakeCore:
+    """What the core's part does for the framework tests: it logs the hooks like any other fake part (the real hooks are tested in test_coreinstall.py)."""
+
+    @staticmethod
+    def _log(hook, **kw):
+        with open(os.environ["FAKE_LOG"], "a") as f:
+            f.write(json.dumps({"part": "core", "hook": hook, **kw}) + "\n")
+
+    @staticmethod
+    def hook_detect(ctx):
+        FakeCore._log("detect")
+
+    @staticmethod
+    def hook_plan(ctx):
+        FakeCore._log("plan")
+        return ["would install the core"]
+
+    @staticmethod
+    def hook_install(ctx):
+        FakeCore._log("install", how=ctx.how, source=str(ctx.source))
+        return {"changed": True, "notes": ["did core"]}
+
+    @staticmethod
+    def hook_verify(ctx):
+        FakeCore._log("verify")
+        return []
+
+    @staticmethod
+    def hook_uninstall(ctx):
+        FakeCore._log("uninstall")
+        return {"changed": True}
+
+
 class Base(unittest.TestCase):
     def setUp(self):
+        real = coreinstall.part
+
+        def fake_part():
+            p = real()
+            p.module = FakeCore
+            return p
+
+        patch = mock.patch.object(coreinstall, "part", fake_part)
+        patch.start()
+        self.addCleanup(patch.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.d = Path(self.tmp.name)
         self.bundle = self.d / "bundle"
@@ -106,8 +149,13 @@ class Base(unittest.TestCase):
         except OSError:
             return []
 
-    def hooks_of(self, hook):
-        return [c["part"] for c in self.calls() if c["hook"] == hook]
+    def hooks_of(self, hook, core=False):
+        """The parts a hook was called for, in order. The core (which is always first) is left out unless asked for."""
+        return [c["part"] for c in self.calls() if c["hook"] == hook and (core or c["part"] != "core")]
+
+    def recorded(self):
+        """The parts in the state record, without the core."""
+        return {k: v for k, v in (state.read(str(self.rootdir)) or {}).get("parts", {}).items() if k != "core"}
 
     def run_cli(self, *argv, answers=()):
         """The whole command through the dispatcher; returns (status, output)."""
@@ -269,16 +317,19 @@ class Run(Base):
         self.assertEqual(rc, 0, out)
         self.assertEqual(self.hooks_of("install"), ["omega", "alpha"])
         self.assertEqual(self.hooks_of("verify"), ["omega", "alpha"])
+        self.assertEqual(
+            self.hooks_of("install", core=True)[0], "core"
+        )  # every part needs the core, which is installed first
         st = state.read(str(self.rootdir))
-        self.assertEqual(st["parts"], {"alpha": "1.0.0", "omega": "1.0.0"})
+        self.assertEqual(st["parts"], {"core": "1.0.0", "alpha": "1.0.0", "omega": "1.0.0"})
         self.assertEqual(st["version"], material_boot.__version__)
-        self.assertIn("Installed: omega, alpha.", out)
+        self.assertIn("Installed: core, omega, alpha.", out)
 
     def test_options_reach_the_part_and_the_look_is_written_before_any_part_runs(self):
         self.part("grub", install={"default": True, "options": [{"name": "res", "takes": "value"}]})
         rc, out = self.run_cli("--yes", "--style", "list", "--res", "1280x720")
         self.assertEqual(rc, 0, out)
-        (call,) = [c for c in self.calls() if c["hook"] == "install"]
+        (call,) = [c for c in self.calls() if c["hook"] == "install" and c["part"] != "core"]
         self.assertEqual(call["options"], {"res": "1280x720"})
         self.assertEqual(call["style"], "list")  # the part saw the look that was asked for
         self.assertIn("STYLE=list", (self.rootdir / "etc/material-grub.conf").read_text())
@@ -307,10 +358,8 @@ class Run(Base):
         rc, out = self.run_cli("--yes")
         self.assertEqual(rc, 1)
         self.assertEqual(self.hooks_of("install"), ["aaa", "bbb"])  # ccc was never started
-        self.assertEqual(
-            state.read(str(self.rootdir))["parts"], {"aaa": "1.0.0"}
-        )  # only the one that succeeded is recorded
-        self.assertIn("Installed: aaa. Failed: bbb. Not run: ccc.", out)
+        self.assertEqual(self.recorded(), {"aaa": "1.0.0"})  # only the one that succeeded is recorded
+        self.assertIn("Installed: core, aaa. Failed: bbb. Not run: ccc.", out)
         self.assertIn("RuntimeError: disk full", out)
         self.assertIn("Run again to retry the rest.", out)
 
@@ -319,7 +368,7 @@ class Run(Base):
         rc, out = self.run_cli("--yes")
         self.assertEqual(rc, 1)
         self.assertIn("the theme is missing", out)
-        self.assertIsNone(state.read(str(self.rootdir)))
+        self.assertEqual(self.recorded(), {})  # the part that failed its verify is not recorded
 
     def test_a_state_entry_a_part_wrote_survives_the_record(self):
         self.part("plymouth", install={"default": True}, state_entry={"version": "0.9", "changes": ["cmdline"]})
@@ -418,11 +467,15 @@ class Uninstall(Base):
         self.part("alpha", install={"needs": ["omega"]})
         self.part("omega", install={"default": True})
         self.run_cli("--yes", "--with", "alpha")
-        self.assertEqual(sorted(state.read(str(self.rootdir))["parts"]), ["alpha", "omega"])
+        self.assertEqual(sorted(self.recorded()), ["alpha", "omega"])
         rc, out = self.run_cli("--yes", "--uninstall")
         self.assertEqual(rc, 0, out)
         self.assertEqual(self.hooks_of("uninstall"), ["alpha", "omega"])  # what needs omega goes first
-        self.assertEqual(state.read(str(self.rootdir))["parts"], {})
+        self.assertEqual(self.recorded(), {})
+        self.assertEqual(
+            self.hooks_of("uninstall", core=True), ["alpha", "omega"]
+        )  # the core stays: it goes last and only on request
+        self.assertIn("core", state.read(str(self.rootdir))["parts"])
         self.assertIn("Removed: alpha, omega.", out)
 
     def test_uninstall_never_falls_back_to_the_defaults(self):
@@ -448,7 +501,50 @@ class Uninstall(Base):
         self.part("plymouth")
         self.run_cli("--yes", "--with", "grub", "--with", "plymouth")
         self.run_cli("--yes", "--uninstall", "--only", "plymouth")
-        self.assertEqual(state.read(str(self.rootdir))["parts"], {"grub": "1.0.0"})
+        self.assertEqual(self.recorded(), {"grub": "1.0.0"})
+
+
+class TheCore(Base):
+    def test_it_is_installed_first_and_by_default(self):
+        self.part("grub", install={"default": True})
+        rc, out = self.run_cli("--yes")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(self.hooks_of("install", core=True), ["core", "grub"])
+        self.assertEqual([c["how"] for c in self.calls() if c["part"] == "core" and c["hook"] == "install"], ["source"])
+
+    def test_the_bundle_is_handed_to_it(self):
+        self.part("grub", install={"default": True})
+        self.run_cli("--yes")
+        (c,) = [c for c in self.calls() if c["part"] == "core" and c["hook"] == "install"]
+        self.assertEqual(c["source"], str(self.bundle))
+
+    def test_a_package_install_says_so(self):
+        self.part("grub", install={"default": True})
+        self.run_cli("--yes", "--from-package")
+        (c,) = [c for c in self.calls() if c["part"] == "core" and c["hook"] == "install"]
+        self.assertEqual(c["how"], "package")
+
+    def test_it_cannot_be_left_out(self):
+        self.part("grub", install={"default": True})
+        rc, out = self.run_cli("--yes", "--without", "core")
+        self.assertEqual(rc, 2)
+        self.assertIn("the core cannot be left out", out)
+
+    def test_only_another_part_does_not_touch_it(self):
+        self.part("grub", install={"default": True})
+        state.record(str(self.rootdir), "1.0.0", "source", "normal", parts={"core": "1.0.0"})
+        rc, _ = self.run_cli("--yes", "--only", "grub")
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.hooks_of("install", core=True), ["grub"])
+
+    def test_it_is_removed_only_on_request(self):
+        self.part("grub", install={"default": True})
+        self.run_cli("--yes")
+        self.assertEqual(self.run_cli("--yes", "--uninstall")[0], 0)
+        self.assertEqual(self.hooks_of("uninstall", core=True), ["grub"])
+        self.assertEqual(self.run_cli("--yes", "--uninstall", "--only", "core")[0], 0)
+        self.assertEqual(self.hooks_of("uninstall", core=True), ["grub", "core"])
+        self.assertNotIn("core", state.read(str(self.rootdir))["parts"])
 
 
 class Events(Base):

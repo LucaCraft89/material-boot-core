@@ -4,7 +4,7 @@
     colour [WHAT]             one seed colour for the whole look (#RRGGBB or a name), or `multi`
     presets ...               list | save NAME | apply NAME | delete NAME | export NAME FILE | import FILE
     overrides ...             show | check | path | edit   (colours, names and icons per entry)
-    apply [--only PART]       run the `apply` command of every installed part that has one
+    apply [--only PART]       rebuild the shared data when the scheme changed, then run the `apply` command of every installed part that has one
     doctor                    the state of the core and of every part (and each part's own checks)
     parts                     which parts are installed, and why one cannot be used
     install ...               install, update or remove parts (material_boot/installer.py, docs/installer.md)
@@ -232,6 +232,20 @@ def c_apply(argv):
         if not only:
             say(f"usage: {PROG} core apply [--only PART] [ARGS passed to the parts]")
             return 2
+    if (
+        only in (None, "core")
+    ):  # the shared data depends on the scheme: a changed SCHEME means the data is rebuilt before any part draws from it
+        from . import coreinstall
+
+        try:
+            msg = coreinstall.refresh_data("", mgconf.load_conf().get("SCHEME"))
+        except (RuntimeError, OSError) as e:
+            say(f"{PROG}: {e}")
+            return 1
+        if msg:
+            say(msg)
+        if only == "core":
+            return 0
     parts = [p for p in plugins.usable() if "apply" in p.commands and only in (None, p.name)]
     if only and not parts:
         say(f"{PROG}: no usable part '{only}' with an apply command")

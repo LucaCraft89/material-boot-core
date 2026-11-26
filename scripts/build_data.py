@@ -20,6 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(1, str(ROOT / "lib"))  # an installed or bundled copy keeps the library in lib/
 
 from PIL import Image  # noqa: E402
 
