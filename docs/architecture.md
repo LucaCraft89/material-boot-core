@@ -21,6 +21,8 @@ Shared by every part: the conf, rules and title parsing; `overrides.json`, prese
 
 **The renderer moves whole** (`scenes`, `custom`, `bgrt_logo`): material-plymouth calls most of it (`hero`, `draw_list`, `draw_side_hero`, `draw_cookie`, `list_label`, ...), so a cut between "primitives" and "GRUB layouts" would be arbitrary. The core therefore still carries some GRUB-flavoured drawing (the rail, the key hints); separating it is a later cleanup, under the same pixel gate.
 
+**Found while moving (C3): `mgsafe` is not shared code.** It validates `grub.cfg` (the script scanner, `grub-script-check`, "entries were lost"); Plymouth never calls it and has its own rollback, and `mgmigrate` has a third. So it stays in material-grub, and a common transaction layer for the unified installer would be a new design (proposed separately), not a move. `mgdetect` is the same kind of case: its state record is generic, its file fingerprints are GRUB's.
+
 Stays in the parts: GRUB scene layouts, resolutions, BLS handling, the `grub.d` scripts, units and hooks, Ventoy (material-grub); the initramfs, kernel command line and script theme (material-plymouth).
 
 ## Packages and paths
@@ -54,7 +56,7 @@ The installer and the packages always assume an install may exist (plan 9c). The
 
 ## Verification rule for the moves
 
-Before any module moves, a snapshot of full renders (styles x schemes x seeds x resolutions) and of the Plymouth layers is taken from the current code. Every pull request that moves code must reproduce it byte for byte: `tests/snapshot/snapshot.py --core` swaps the moved modules for shims onto this package (`MOVED` in that file grows with each move) and compares with `golden.json`.
+Before any module moves, a snapshot of full renders (styles x schemes x seeds x resolutions) and of the Plymouth layers is taken from the current code. Every pull request that moves code must reproduce it byte for byte: `tests/snapshot/snapshot.py --core` swaps the moved modules for shims onto this package (`MOVED` and `PARTIAL` in that file grow with each move: a partly moved module such as `mgrub` is rebuilt without the moved definitions, which are imported from here), and `tests/test_provenance.py` checks that every moved definition equals the original, statement for statement and compares with `golden.json`.
 
 ## Pull requests
 

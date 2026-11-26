@@ -74,6 +74,10 @@ jobs:
           python scripts/compare_data.py "$RUNNER_TEMP/data-dark" "$RUNNER_TEMP/pkg-dark"
           python scripts/build_data.py --out "$RUNNER_TEMP/data-light" --scheme light
           python scripts/compare_data.py "$RUNNER_TEMP/data-light" "$RUNNER_TEMP/pkg-light"
+      - name: Moved code is the original code (syntax trees equal)
+        run: python -m unittest -v tests.test_provenance
+        env:
+          MATERIAL_GRUB: ${{ github.workspace }}/material-grub
       - name: Renderer tests that need a built package
         run: python -m unittest -v tests.test_panel tests.test_custom
         env:

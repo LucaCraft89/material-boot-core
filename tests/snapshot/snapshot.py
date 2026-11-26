@@ -18,6 +18,7 @@ every pull request that moves code runs this again and must reproduce it exactly
 Needs Pillow. Takes a few minutes: it is a matrix of real renders.
 """
 
+import ast
 import hashlib
 import json
 import os
@@ -158,6 +159,41 @@ def render(case, bindir, pkg, paths):
         shutil.rmtree(d, ignore_errors=True)
 
 
+# Modules that were only partly moved: material-grub module -> [(material_boot module, [names that moved])]. The gate rebuilds the original file without those
+# definitions and imports them from the core, which is what material-grub's own switch-over does.
+PARTIAL = {
+    "mgrub": [
+        ("conf", ["CONF_DEFAULTS", "CONF_CHOICES", "load_conf", "_conf_ok", "write_conf"]),
+        ("titles", ["load_rules", "key_for", "uid", "parse_title", "kind_of"]),
+        ("catalog", ["GENERIC"]),
+    ],
+}
+
+
+def rebuilt(source, moves):
+    """`source` (a module's text) without the top-level definitions named in `moves`, plus an import of them from the core after the docstring."""
+    tree = ast.parse(source)
+    gone = {n for _mod, names in moves for n in names}
+
+    def defined(node):
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+            return {node.name}
+        if isinstance(node, ast.Assign):
+            return {t.id for t in node.targets if isinstance(t, ast.Name)}
+        return set()
+
+    kept = [n for n in tree.body if not (defined(n) and defined(n) <= gone)]
+    removed = {x for n in tree.body for x in defined(n)} & gone
+    if removed != gone:
+        raise SystemExit(f"the original no longer defines {sorted(gone - removed)}: update PARTIAL in snapshot.py")
+    imports = [ast.parse(f"from material_boot.{mod} import {', '.join(names)}").body[0] for mod, names in moves]
+    at = (
+        1 if kept and isinstance(kept[0], ast.Expr) and isinstance(getattr(kept[0], "value", None), ast.Constant) else 0
+    )
+    tree.body = kept[:at] + imports + kept[at:]
+    return ast.unparse(ast.fix_missing_locations(tree)) + "\n"
+
+
 def with_core(bindir):
     """A copy of material-grub's bin directory where every moved module is a shim for the core's. Returns (new dir, temp dir to delete)."""
     tmp = Path(tempfile.mkdtemp(prefix="snap-bin-"))
@@ -167,7 +203,26 @@ def with_core(bindir):
         (new / f"{old}.py").write_text(
             f"import sys\nfrom material_boot import {mod}\n\nsys.modules[__name__] = {mod}\n"
         )
+    for old, moves in PARTIAL.items():
+        (new / f"{old}.py").write_text(rebuilt((new / f"{old}.py").read_text(), moves))
+    check_gate(new)
     return new, tmp
+
+
+def check_gate(new):
+    """The gate must really be using the core: every moved module is a shim, and every moved definition of a partial module is imported, not defined.
+    (A gate that silently runs material-grub's own code would pass everything.)"""
+    for old, mod in MOVED.items():
+        if f"material_boot import {mod}" not in (new / f"{old}.py").read_text():
+            raise SystemExit(f"gate error: {old}.py is not a shim for material_boot.{mod}")
+    for old, moves in PARTIAL.items():
+        tree = ast.parse((new / f"{old}.py").read_text())
+        imported = {a.name for n in tree.body if isinstance(n, ast.ImportFrom) for a in n.names}
+        defined = {n.name for n in tree.body if isinstance(n, (ast.FunctionDef, ast.ClassDef))}
+        for _mod, names in moves:
+            for n in names:
+                if n not in imported or n in defined:
+                    raise SystemExit(f"gate error: {old}.{n} is not taken from the core")
 
 
 def main(argv):
@@ -184,7 +239,10 @@ def main(argv):
     if "--core" in argv:
         bindir, tmp = with_core(bindir)
         paths.append(ROOT)
-        print(f"using the core's {', '.join(MOVED.values())} (shims in {bindir})")
+        print(
+            f"using the core's {', '.join(MOVED.values())} and, from {', '.join(PARTIAL)}, "
+            f"{', '.join(m for ms in PARTIAL.values() for m, _ in ms)} (shims in {bindir})"
+        )
     paths.insert(0, bindir)
     only = opt("--only")
     got = {}
