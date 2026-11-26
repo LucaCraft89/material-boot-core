@@ -68,6 +68,12 @@ jobs:
         run: >
           python tests/snapshot/snapshot.py --core --bin material-grub/install/bin
           --pkg-dark "$RUNNER_TEMP/pkg-dark" --pkg-light "$RUNNER_TEMP/pkg-light"
+      - name: The shared data this repository builds equals what material-grub builds (dark and light)
+        run: |
+          python scripts/build_data.py --out "$RUNNER_TEMP/data-dark"
+          python scripts/compare_data.py "$RUNNER_TEMP/data-dark" "$RUNNER_TEMP/pkg-dark"
+          python scripts/build_data.py --out "$RUNNER_TEMP/data-light" --scheme light
+          python scripts/compare_data.py "$RUNNER_TEMP/data-light" "$RUNNER_TEMP/pkg-light"
       - name: Renderer tests that need a built package
         run: python -m unittest -v tests.test_panel tests.test_custom
         env:
