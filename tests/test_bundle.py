@@ -131,6 +131,31 @@ class Build(Base):
         _, stage = self.build()
         self.assertFalse((stage / "parts/grub/untracked.txt").exists())
 
+    def test_excluded_paths_are_left_out_and_the_rest_stays(self):
+        for part in (self.grub,):
+            (part / "docs").mkdir()
+            (part / "docs/big.png").write_text("x" * 100)
+            (part / "keep").mkdir()
+            (part / "keep/a.txt").write_text("a")
+            subprocess.run([*GIT, "add", "."], cwd=part, check=True)
+            subprocess.run([*GIT, "commit", "-q", "-m", "docs"], cwd=part, check=True)
+        cfg = json.loads(self.cfg.read_text())
+        cfg["parts"]["grub"]["exclude"] = ["docs", "README.md"]
+        self.cfg.write_text(json.dumps(cfg))
+        _, stage = self.build()
+        self.assertFalse((stage / "parts/grub/docs").exists())
+        self.assertFalse((stage / "parts/grub/README.md").exists())
+        self.assertTrue((stage / "parts/grub/keep/a.txt").is_file())
+        self.assertTrue((stage / "parts/plymouth/README.md").is_file(), "only the part it was listed for")
+
+    def test_an_exclude_cannot_take_the_manifest_or_leave_the_part(self):
+        for bad in ("material-boot-part.json", "../lib"):
+            cfg = json.loads(self.cfg.read_text())
+            cfg["parts"]["grub"]["exclude"] = [bad]
+            self.cfg.write_text(json.dumps(cfg))
+            with self.assertRaises(SystemExit):
+                self.build()
+
     def test_bundle_json_says_what_is_in_it(self):
         _, stage = self.build()
         b = json.loads((stage / "BUNDLE.json").read_text())
