@@ -27,6 +27,16 @@ PROVENANCE = [
     ("material_boot/titles.py", "install/bin/mgrub.py", ["load_rules", "key_for", "uid", "parse_title", "kind_of"]),
     ("material_boot/catalog.py", "scripts/catalog.py", ["D", "X", "ENTRIES", "SEEDS", "CLASSES"]),
     ("material_boot/catalog.py", "install/bin/mgrub.py", ["GENERIC"]),
+    (
+        "material_boot/state.py",
+        "install/bin/mgdetect.py",
+        ["STATE_VERSION", "version_tuple", "_state_dir", "state_path", "read", "write", "record", "owner_of"],
+    ),
+    (
+        "material_boot/migrate.py",
+        "install/bin/mgmigrate.py",
+        ["Step", "ConfSamples", "STEPS", "context", "steps_for", "plan", "backup_dir", "_rel", "run"],
+    ),
 ]
 
 
