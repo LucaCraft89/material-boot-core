@@ -118,13 +118,21 @@ jobs:
 
   bundle:
     # The whole unified installer, for real: a bundle made of this core and the REAL parts (material-grub, material-plymouth, from the refs below), installed in a
-    # Fedora container with a fake /boot: a dry run changes nothing; GRUB is installed (the default part), then Plymouth (a real dracut rebuild, checked);
-    # doctor has a section per part; both are removed again (grub.cfg and the initramfs as before) and the core stays. Software only, no VM.
-    name: The bundle with the real parts (Fedora)
+    # distro container with a fake /boot: a dry run changes nothing; GRUB is installed (the default part), then Plymouth (a real initramfs rebuild with the
+    # distro's own tool, checked); doctor has a section per part; both are removed again (grub.cfg as before, the image without the theme) and the core stays.
+    name: The bundle with the real parts (${{ matrix.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: Fedora, image: "registry.fedoraproject.org/fedora:latest"}
+          - {name: Debian, image: "docker.io/library/debian:stable"}
+          - {name: Ubuntu, image: "docker.io/library/ubuntu:24.04"}
+          - {name: Arch,   image: "docker.io/library/archlinux:latest"}
     env:
-      PART_GRUB_REF: ${{ vars.PART_GRUB_REF || 'feat/upgrade-matrix' }}
-      PART_PLYMOUTH_REF: ${{ vars.PART_PLYMOUTH_REF || 'feat/packages-core' }}
+      PART_GRUB_REF: ${{ vars.PART_GRUB_REF || 'release/0.8.0' }}
+      PART_PLYMOUTH_REF: ${{ vars.PART_PLYMOUTH_REF || 'main' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -135,8 +143,8 @@ jobs:
       - run: python3 scripts/build_bundle.py --out build/bundle --part grub=parts-grub --part plymouth=parts-plymouth
       - run: |
           mkdir -p build/out
-          docker run --rm -v "$PWD/build/bundle/material-boot-$(cat VERSION):/bundle:ro" -v "$PWD:/src:ro" -v "$PWD/build/out:/out" registry.fedoraproject.org/fedora:latest sh /src/tests/containers/bundle_smoke.sh
+          docker run --rm -v "$PWD/build/bundle/material-boot-$(cat VERSION):/bundle:ro" -v "$PWD:/src:ro" -v "$PWD/build/out:/out" "${{ matrix.image }}" sh /src/tests/containers/bundle_smoke.sh
       - run: cat build/out/bundle-smoke.txt; grep -q "^ALL OK" build/out/bundle-smoke.txt
       - uses: actions/upload-artifact@v4
         if: always()
-        with: {name: "bundle-smoke", path: build/out/}
+        with: {name: "bundle-smoke-${{ matrix.name }}", path: build/out/}
