@@ -26,6 +26,8 @@ class Skeleton(unittest.TestCase):
 
     def test_imports_with_nothing_installed(self):
         # the core must import on a bare system: Pillow and friends are imported by the modules that need them, never by the package itself
+        from material_boot import overrides, palette, seeds  # noqa: F401  (the pure modules: stdlib only)
+
         self.assertNotIn("PIL", sys.modules)
 
 

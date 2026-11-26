@@ -21,13 +21,13 @@ jobs:
 
   unit:
     name: Unit tests (Python ${{ matrix.python }})
-    # Python 3.8 is the oldest Python the material-grub tools run on (RHEL 8 family), 3.13 the newest in use. Pinned to 24.04: `ubuntu-latest` has no
-    # Python 3.8 for setup-python.
+    # Python 3.9 is the floor: the packages of material-grub already require it, and the vendored colour science (material_boot/_vendor) uses
+    # `list[float]` annotations, which crash on 3.8 (found by this matrix). 3.13 is the newest in use. Pinned to 24.04, which has the old setup-python builds.
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.8", "3.13"]
+        python: ["3.9", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

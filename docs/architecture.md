@@ -31,6 +31,7 @@ Stays in the parts: GRUB scene layouts, resolutions, BLS handling, the `grub.d` 
 | `material-grub-gui` | as today | core |
 | `material-boot` (meta) | nothing | core and grub; **not** Plymouth, which rebuilds the initramfs and is always an explicit choice |
 
+- **Python 3.9 is the floor** (the same as material-grub's packages). The vendored colour science does not import on 3.8, which CI found; material-grub's installer still says "3.8+" for the installed tools, which is therefore wrong and is tracked for G1.
 - The core uses **new paths**, so no file changes owner between packages (that is what breaks rpm, dpkg and pacman upgrades).
 - The core is a private directory on `sys.path`, not `site-packages`, like the tools today; the immutable-system copy in `/var/lib/material-grub/pkg` carries it too.
 - **User data keeps its names and places**: `/etc/material-grub.conf`, `/etc/material-grub/`, `/var/lib/material-grub/`. No symlink (it adds failure modes for nothing); the names are historical.
