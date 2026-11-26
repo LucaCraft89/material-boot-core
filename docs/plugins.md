@@ -93,7 +93,11 @@ Called by the unified installer, `doctor` and the upgrade machinery, each as `ho
 
 ## Commands
 
-`material-boot <part> [command]`. The core is itself a module: `material-boot core <command>` carries the settings and tools that belong to the whole system (`colour`, `presets`, `overrides`, `conf`, `doctor`, `update`, `uninstall`, `gui`, `apply`). Only `help`, `version` and the menu are top-level. `material-grub X` stays as an alias with the old behaviour; the legacy names (`material-grub colour`, `material-grub plymouth apply`, ...) are mapped by the GRUB part and the dispatcher (C4), not by this API.
+`material-boot <part> [command]`. The core is itself a module: `material-boot core <command>` carries the settings and tools that belong to the whole system. Today: `conf`, `colour`, `overrides`, `apply`, `doctor` and `parts`; `presets`, `update`, `uninstall` and `gui` follow with the code they need. Only `help`, `version` and the menu are top-level; a core command typed at the top level gets a "did you mean `material-boot core ...`" hint.
+
+- **`core apply`** runs the `apply` command of every usable part whose manifest lists one (`commands`), in name order; one failing does not stop the others, and the exit status says so. `--only PART` runs one.
+- **`core doctor`** prints the core, every part (and why one cannot be used), then each part's `hook_doctor(ctx)` lines `[(level, text)]`; a level of `fail` or `error`, a part that cannot be used, or a hook that crashes makes the exit status 1.
+- **`material-grub X`** is not mapped onto these: it stays as material-grub's own front end with its own commands, messages and exit codes (see `architecture.md`), so the hooks, the path unit and the polkit helper cannot notice the change.
 
 ## Testing a part
 

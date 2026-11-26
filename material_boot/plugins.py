@@ -306,3 +306,32 @@ def make_core(say=print, run_cmd=None, elevate=None, conf_path=None, data=None, 
         state_dir=state_dir or (lambda: Path(os.environ.get("MATERIAL_STATE_DIR", "/var/lib/material-grub"))),
         parts=tuple(parts),
     )
+
+
+def make_ctx(
+    core=None,
+    root="",
+    dry_run=False,
+    yes=False,
+    progress=None,
+    options=None,
+    conf=None,
+    backup_dir=None,
+    previous=None,
+    target_version=None,
+):
+    """The `ctx` every hook_<name>(ctx) gets (docs/plugins.md): the `core` object, `root` (a staged tree for tests and packaging; empty for the real
+    system), `dry_run`, `yes`, `progress(event)` (the --progress json stream), `options` (the part's own installer choices), `conf` (the settings),
+    `backup_dir`, `previous` (what the state record says about this part, or None) and `target_version`."""
+    return SimpleNamespace(
+        core=core or make_core(),
+        root=root,
+        dry_run=dry_run,
+        yes=yes,
+        progress=progress or (lambda event: None),
+        options=dict(options or {}),
+        conf=dict(conf or {}),
+        backup_dir=backup_dir,
+        previous=previous,
+        target_version=target_version or __version__,
+    )
