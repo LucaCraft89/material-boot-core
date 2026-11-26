@@ -46,6 +46,8 @@ def hook_install(ctx):
         st = state.read(ctx.root) or {"state": 1, "parts": {}}
         st.setdefault("parts", {})[CFG["name"]] = CFG["state_entry"]
         state.write(ctx.root, st)
+    for ev in CFG.get("progress", []):
+        ctx.progress(ev)
     return {"changed": True, "notes": ["did " + CFG["name"]], "record": CFG.get("record", True)}
 
 def hook_verify(ctx):
@@ -382,6 +384,42 @@ class Run(Base):
             self.assertEqual(rc, 0)
             self.assertEqual([c["json"] for c in self.calls() if c["hook"] == "install" and c["part"] == "aaa"], [want])
 
+    def test_the_events_of_a_parts_own_program_are_relayed_even_with_a_time_of_their_own(self):
+        """material-grub's installer prints events with `t`, `n`, `total`: relayed, tagged with the part, without colliding with the installer's own fields."""
+        self.part(
+            "aaa",
+            install={"default": True},
+            progress=[
+                {"event": "step", "t": 99.0, "n": 1, "total": 4, "msg": "rendering"},
+                {"event": "log", "text": "line", "part": "other"},
+            ],
+        )
+        lines = []
+        with (
+            mock.patch.object(sys.__stdout__, "write", side_effect=lambda s: lines.append(s) or len(s)),
+            mock.patch.object(sys.__stdout__, "flush"),
+        ):
+            rc = cli.main(
+                [
+                    "core",
+                    "install",
+                    "--bundle",
+                    str(self.bundle),
+                    "--root",
+                    str(self.rootdir),
+                    "--progress",
+                    "json",
+                    "--yes",
+                ]
+            )
+        self.assertEqual(rc, 0)
+        events = [json.loads(x) for x in lines if x.strip()]
+        mine = [e for e in events if e.get("msg") == "rendering"]
+        self.assertEqual(len(mine), 1, events)
+        self.assertEqual((mine[0]["part"], mine[0]["n"], mine[0]["total"]), ("aaa", 1, 4))
+        self.assertNotEqual(mine[0]["t"], 99.0, "the time is the installer's")
+        self.assertEqual(events[-1]["event"], "done")
+
     def test_a_part_that_only_built_something_is_not_recorded(self):
         self.part("aaa", install={"default": True}, record=False)
         self.part("bbb", install={"default": True})
@@ -604,6 +642,10 @@ class Events(Base):
         self.assertEqual(events[-1]["event"], "done")
         self.assertTrue(events[-1]["ok"])
         self.assertTrue(all(isinstance(e["t"], float) or isinstance(e["t"], int) for e in events))
+        for e in events:
+            if e["event"] in ("step", "info", "ok", "warn", "error"):
+                self.assertIn("msg", e, e)  # the GUI reads `msg`
+        self.assertEqual(events[-1]["rc"], 0)
 
 
 class Findings(unittest.TestCase):

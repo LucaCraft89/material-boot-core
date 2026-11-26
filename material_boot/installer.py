@@ -287,7 +287,16 @@ class Installer:
             progress=lambda ev, n=part.name if part else None: self.emit(
                 ev.get("event", "info") if isinstance(ev, dict) else "info",
                 part=n,
-                **{k: v for k, v in (ev if isinstance(ev, dict) else {"text": str(ev)}).items() if k != "event"},
+                **{
+                    k: v
+                    for k, v in (ev if isinstance(ev, dict) else {"text": str(ev)}).items()
+                    if k
+                    not in (
+                        "event",
+                        "t",
+                        "part",
+                    )  # the installer's own (time, which part): a part's program may have its own `t`
+                },
             ),
             options=(o.part_opts.get(part.name, {}) if part else {}),
             conf=mgconf.load_conf(str(self.conf_path())),
@@ -587,6 +596,11 @@ def main(argv, say=print, ask=None):
     if o.json:
 
         def emit(event, **kw):
+            # the shape the GUI reads (what `install.sh --progress json` has always printed): the line is `msg`, and `done` carries the exit status
+            if event in ("step", "info", "ok", "warn", "error") and "text" in kw:
+                kw.setdefault("msg", kw["text"])
+            if event == "done" and "ok" in kw:
+                kw.setdefault("rc", 0 if kw["ok"] else 1)
             sys.__stdout__.write(json.dumps({"event": event, **kw}) + "\n")
             sys.__stdout__.flush()
 
