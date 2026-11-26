@@ -43,7 +43,7 @@ case $ID in
     CFG=/boot/grub/grub.cfg; MK=grub-mkconfig; PROBE=/usr/bin/grub-probe; LISTER=lsinitcpio ;;
   opensuse*)
     zypper --non-interactive --gpg-auto-import-keys refresh >/dev/null
-    zypper --non-interactive install --no-recommends grub2 rsvg-convert python3 python3-pip python3-Pillow plymouth plymouth-plugin-script plymouth-plugin-label plymouth-plugin-label-ft plymouth-scripts plymouth-dracut dracut findutils kmod kernel-default-base >/dev/null
+    zypper --non-interactive install --no-recommends grub2 rsvg-convert python3 python3-pip python3-Pillow plymouth plymouth-plugin-script plymouth-plugin-label plymouth-plugin-label-ft plymouth-scripts plymouth-dracut dracut findutils diffutils kmod kernel-default-base >/dev/null
     for k in /lib/modules/*; do depmod -a "$(basename "$k")"; done
     kver=$(ls /lib/modules | head -n1); mkdir -p /boot/grub2 /etc/default
     IMG="/boot/initrd-$kver"; dracut -f --no-hostonly "$IMG" "$kver" >/dev/null 2>&1
