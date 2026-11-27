@@ -440,6 +440,21 @@ class Preview(unittest.TestCase):
         self.assertTrue(all(len(r) == tui.PREVIEW_W for r in rows[:-1]))
         self.assertTrue(all(isinstance(s, tuple) and len(s) == 2 for r in rows[:-1] for _, s in r))
 
+    def test_a_terminal_without_256_colours_gets_no_preview_instead_of_noise(self):
+        parts = make_parts()
+        o = options("--with", "grub")
+        f = tui.Flow(tui.build_steps(parts, set(), o), o, {"grub"})
+        coloured = [
+            st
+            for r in f.rows(120, 40)
+            for _, st in r
+            if isinstance(st, tuple) and len(st) == 2 and st[0].startswith("#") and st[1].startswith("#")
+        ]
+        self.assertTrue(coloured)
+        plain = [st for r in f.rows(120, 40, color=False) for _, st in r if isinstance(st, tuple)]
+        self.assertEqual(plain, [])  # no drawing (the seed chips are drawn in colour too, but only on their own step)
+        self.assertNotIn("\u2580", text_of(f.rows(120, 40, color=False)))
+
     def test_no_preview_for_a_question_about_something_else(self):
         self.assertEqual(tui.preview_rows(self.values(), {"id": "grub.res"}), [])
 

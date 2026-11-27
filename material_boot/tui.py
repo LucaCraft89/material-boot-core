@@ -481,7 +481,7 @@ class Flow:
         return " ".join(["material-boot core install", *self.flags()])
 
     # -- what to draw
-    def rows(self, w=80, h=24):
+    def rows(self, w=80, h=24, color=True):
         """-> a list of rows, each a list of (text, style). Styles: title, dim, sel, ok, warn, key, or ('#fg', '#bg') for the preview."""
         s = self.current()
         vis = self.visible()
@@ -498,7 +498,9 @@ class Flow:
             hv = s["options"][self.cursor(s)]["value"]  # the preview follows the highlighted option
             if hv != TEXT:
                 vals[s["id"]] = hv
-        prev = preview_rows(vals, s)
+        prev = (
+            preview_rows(vals, s) if color else []
+        )  # the drawing is made of coloured half blocks: without 256 colours it would be noise
         if prev and w >= 100:
             pw = max(sum(len(t) for t, _ in r) for r in prev)
             lw = w - pw - 6  # the questions keep to the left of the drawing
@@ -768,7 +770,7 @@ def run_curses(flow):
             if h < 12 or w < 50:
                 scr.addstr(0, 0, "Make the terminal bigger (50x12 at least), or q to quit"[: w - 1])
             else:
-                rows = flow.rows(w, h)
+                rows = flow.rows(w, h, color=big)
                 for y, row in enumerate(rows[: h - 1]):
                     x = 1
                     for text, style in row:
