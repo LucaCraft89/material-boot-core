@@ -72,7 +72,7 @@ python3 - <<'PY' && say "state record: core and grub, one history" || { say "sta
 import json
 s = json.load(open("/var/lib/material-grub/state.json"))
 assert set(s["parts"]) == {"core", "grub"}, s
-assert [h["to"] for h in s["history"]] == ["1.0.0"], s["history"]
+assert [h["to"] for h in s["history"]] == [open("/bundle/VERSION").read().strip()], s["history"]  # the core's version, whatever it is
 PY
 [ -e /usr/share/plymouth/themes/material ] && { say "Plymouth was applied without being asked"; exit 1; } || say "Plymouth is not installed (not a default part)"
 
