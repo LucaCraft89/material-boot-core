@@ -142,6 +142,8 @@ jobs:
         with: {repository: LucaCraft89/material-plymouth, ref: "${{ env.PART_PLYMOUTH_REF }}", path: parts-plymouth}
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil librsvg2-bin
       - run: python3 scripts/build_bundle.py --out build/bundle --part grub=parts-grub --part plymouth=parts-plymouth
+      - name: The screen against the real parts' questions
+        run: python3 tests/check_bundle_questions.py "build/bundle/material-boot-$(cat VERSION)"
       - run: |
           mkdir -p build/out
           docker run --rm -v "$PWD/build/bundle/material-boot-$(cat VERSION):/bundle:ro" -v "$PWD:/src:ro" -v "$PWD/build/out:/out" "${{ matrix.image }}" sh /src/tests/containers/bundle_smoke.sh
