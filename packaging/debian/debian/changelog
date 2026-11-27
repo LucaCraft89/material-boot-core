@@ -1,3 +1,10 @@
+material-boot-core (1.1.0) unstable; urgency=medium
+
+  * The installer screen: parts checklist, the shared look with a preview, and
+    each part's own questions (install.questions in a part's manifest).
+
+ -- LucaCraft89 <noreply@users.noreply.github.com>  Fri, 27 Nov 2026 21:00:00 +0000
+
 material-boot-core (1.0.1) unstable; urgency=medium
 
   * install.sh uses the distribution's python3 (one that can import Pillow) and

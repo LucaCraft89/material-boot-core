@@ -2,7 +2,7 @@
   "format": 1,
   "comment": "The parts one bundle carries, pinned. `ref` is a tag (scripts/build_bundle.py --release refuses anything else). For a development build, point a part at a local checkout with --part NAME=DIR, or edit the ref to a branch in a private copy. Each part's repository keeps its manifest in material-boot-part.json at its root. `exclude` lists paths of the part that the bundle does not carry (documentation images, tests): the bundle is what is installed, not the repository.",
   "parts": {
-    "grub": {"repo": "LucaCraft89/material-grub", "ref": "v1.0.0", "exclude": ["docs", "tests", ".github"]},
-    "plymouth": {"repo": "LucaCraft89/material-plymouth", "ref": "v1.0.0", "exclude": ["docs", "tests", ".github", "ci"]}
+    "grub": {"repo": "LucaCraft89/material-grub", "ref": "v1.1.0", "exclude": ["docs", "tests", ".github"]},
+    "plymouth": {"repo": "LucaCraft89/material-plymouth", "ref": "v1.1.0", "exclude": ["docs", "tests", ".github", "ci"]}
   }
 }
