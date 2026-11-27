@@ -1,6 +1,6 @@
 # The installer screen (TUI), redesigned
 
-**Status: proposal, for the maintainer's review. No code yet.** Written after the first real install of 1.0.0, which showed that the unified installer has no screen at all.
+**Status: T0 to T3 implemented** (pull request "The installer screen"; the parts declare their questions in material-grub and material-plymouth). The sections below are the proposal as written; section 10 says what was built, what was decided about the open questions, and what is left. Written after the first real install of 1.0.0, which showed that the unified installer had no screen at all.
 
 ## 1. Where we are, honestly
 
@@ -72,3 +72,17 @@ Everything below already exists in the GUI or in `overrides.json` and presets; t
 4. Is `1.1.0` right for T0 to T2, with 1.0.x kept for fixes?
 
 Not decided here: a graphical (non-terminal) installer. The GUI already covers that after install.
+
+## 10. What was built (2026-11-27, overnight) and what was decided
+
+**Built:** `material_boot/tui.py` (the state machine `Flow`, curses with a plain-prompt fallback, the summary with the equivalent command line), `install.questions` in a part's manifest (plugins.md), the parts' own questions (grub: resolution, raw names, countdown, timeout, the editor; plymouth: loading bar, motion, the command line), the preview and the colour chips, scrolling, and these tests: unit tests of the questions, the state machine and the preview; golden screens at 80x24 and 120x40; the real curses screen on a pty (keys in, 256-colour escapes out); the screen against the real parts' manifests of a built bundle; and a container test in which a person-like driver installs GRUB with the keyboard and the result is checked (settings, grub.cfg, removal).
+
+**Decisions on section 9, taken by me while the maintainer slept (each is easy to reverse):**
+1. **The preview**: kept, but it is a *drawing of the layout* in the chosen colours (from the palette), not a render of the real scene: the real renderer needs the shared data, which does not exist before the install. A render of the real scene stays a possible later step (build the data first, then preview).
+2. **Per-entry customisation at install time**: not built. The GUI is the place for it; the screen does not offer it. (T4 is dropped.)
+3. **An update** shows only the parts question (and the questions of a part that is new); `--tui` shows the whole screen.
+4. **1.1.0** for T0 to T3, with 1.0.x kept for fixes (1.0.1 was one).
+
+**Found while building it:** curses sends only the cells that changed, so a test that waits for a whole sentence on the screen fails at random; `MATERIAL_BOOT_TUI_REPAINT=1` repaints everything every time and the tests use it. The installer asked `Continue?` after the screen's own summary (twice the same question): confirming the summary now counts as the confirmation.
+
+**Not built:** presets in and out (start from a saved preset, save the answers as one); a render of the real scene as the preview; a check of how it looks in real terminals (only xterm-256color on a pty was seen, rendered by an emulator).
