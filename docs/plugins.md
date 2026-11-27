@@ -39,7 +39,7 @@ One JSON file per part in a plugin directory: `/usr/share/material-boot/plugins.
 | `commands` | no | `{command: one line}`. For `help`, the menu and error messages ("unknown command, try: ..."); the part still parses its own arguments. |
 | `menu` | no | `[title, description, [words]]` entries of the `material-boot` menu. The first word must be the part's own name: a part cannot add a menu entry that runs another part (it is ignored, with a warning). |
 | `conf` | no | The keys of `/etc/material-grub.conf` the part owns, so `core conf`, presets and the GUI can show and validate them. The file keeps its historical name and path. |
-| `install` | no | For the unified installer ([installer.md](installer.md)): `default` (installed on a fresh system when the user chooses nothing; false for everything that rebuilds the initramfs), `needs` (other parts that must be usable; `core` is implied), `package` (the package that provides the part, for the notice and the "update it with your package manager" command), `layouts` (`normal`, `immutable`: the layouts it supports; the installer refuses the others with a sentence) and `options` (`[{name, takes: "flag"|"value", summary}]`: the part's own install options, accepted as `--<part>-<name>`, and as `--<name>` when only one chosen part declares it). |
+| `install` | no | For the unified installer ([installer.md](installer.md)): `default` (installed on a fresh system when the user chooses nothing; false for everything that rebuilds the initramfs), `needs` (other parts that must be usable; `core` is implied), `package` (the package that provides the part, for the notice and the "update it with your package manager" command), `layouts` (`normal`, `immutable`: the layouts it supports; the installer refuses the others with a sentence) and `options` (`[{name, takes: "flag"|"value", summary}]`: the part's own install options, accepted as `--<part>-<name>`, and as `--<name>` when only one chosen part declares it). and `questions` (optional: what the installer screen asks for this part, see below). |
 | `hooks` | no | Which of the optional installer and `doctor` hooks the entry file defines. |
 
 Problems never take the core down: a broken, incompatible or unsatisfied part is a sentence in `doctor` and `help`; the rest keeps working. Things that were ignored (a malformed command, a menu entry for another part, an unknown hook) are warnings.
@@ -47,6 +47,27 @@ Problems never take the core down: a broken, incompatible or unsatisfied part is
 ### Dependencies
 
 `install.needs` names other parts. A part whose need is missing or unusable is itself unusable, and the chain is followed (`gui` needs `grub`, which is broken, so `gui` is reported as "needs the grub part, which cannot be used"). **material-plymouth needs nothing but the core**: it installs and runs without material-grub. The GUI needs `grub`.
+
+### `install.questions`: what the installer screen asks
+
+Optional and additive (plugin API 2). A part that has none asks nothing on the screen; its options still work as flags. Each question is data, so the core draws it
+and the part needs no code for it:
+
+```json
+"questions": [
+  {"id": "res", "title": "Resolution", "kind": "choice", "help": "The size of your screen.",
+   "options": [{"value": "", "label": "Detected automatically"}, {"value": "1920x1080", "label": "1920x1080", "help": "..."}],
+   "allow_text": true, "pattern": "[0-9]{3,5}x[0-9]{3,5}", "target": {"option": "res"}, "when": "fresh"},
+  {"id": "gui", "title": "Graphical editor", "kind": "toggle", "default": false, "target": {"option": "with-gui"}},
+  {"id": "countdown", "title": "Countdown bar", "kind": "toggle", "default": true, "target": {"conf": "COUNTDOWN"}}
+]
+```
+
+- `kind`: `choice` (one of `options`; `allow_text` adds "Another value..." that takes typed text, checked against `pattern`), `toggle` (yes or no) or `text`.
+- `target`: `{"option": name}` is one of the part's declared install options (the answer becomes that option, as if `--<part>-<name>` had been given: an empty
+  choice and a "no" pass nothing); `{"conf": KEY}` is a key of the shared settings file (written with the look: `on` or `off` for a toggle).
+- `when`: `fresh` (the default: asked while the part is not installed yet) or `always`. A question whose flag was given on the command line is never asked.
+- A malformed question is dropped with a warning (`doctor` shows it); it never makes the part unusable.
 
 ## The entry file
 

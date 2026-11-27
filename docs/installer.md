@@ -71,7 +71,7 @@ Each package ships its part's sources and installs its manifest. **Decision (scr
 
 ## Open points
 
-- The TUI (`install/tui.py`, 1,100 lines) asks GRUB's questions. The unified one asks which parts and the shared look and lets a part add questions through a future `hook_questions`; until then GRUB's TUI runs inside GRUB's `hook_install` when a terminal is present.
+- **Implemented in 1.1.0: the screen** (`material_boot/tui.py`, design in [plans/tui.md](plans/tui.md)): the parts checklist, the shared look with a preview, and each part's `install.questions` (see plugins.md), curses with a plain-prompt fallback, shown on a terminal for a real install (`--no-tui`, `--yes`, `--dry-run`, `--progress json`, a package or a staged root never show it; `--tui` shows the whole screen on an update). GRUB's old TUI (`install/tui.py`, 1,100 lines) asks GRUB's questions. The unified one asks which parts and the shared look and lets a part add questions through a future `hook_questions`; until then GRUB's TUI runs inside GRUB's `hook_install` when a terminal is present.
 - Ventoy sticks are a GRUB-only mode (`--ventoy`); the stick's version marker and `doctor` warning from the plan are still to do.
 - Whether a part's migration steps register through `hook_migrate` or through `migrate.STEPS` (only the core's `ConfSamples` is there today).
 

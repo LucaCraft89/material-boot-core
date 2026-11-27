@@ -1,0 +1,11 @@
+Material Boot installer   step 1 of 11
+
+What to install
+Space ticks or unticks, Enter goes on. The core (the shared code and the
+command) is always installed.
+
+ > [x] Material GRUB
+        the grub part (not installed)
+   [ ] Material Plymouth
+
+Up/Down move  Space tick  Enter next  Esc back  q quit

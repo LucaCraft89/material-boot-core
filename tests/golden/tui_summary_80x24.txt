@@ -1,0 +1,8 @@
+Material Boot installer   step 5 of 6
+
+Kernel command line
+
+   ( ) Yes
+ > (*) No
+
+Up/Down move  Enter select  Esc back  q quit

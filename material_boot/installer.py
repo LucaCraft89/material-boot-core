@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
-from . import __version__, coreinstall, detect, migrate, plugins, state
+from . import __version__, coreinstall, detect, migrate, plugins, state, tui
 from . import conf as mgconf
 from . import overrides as mgoverrides
 from . import seeds as mgseeds
@@ -55,6 +55,7 @@ def parse_args(argv, parts=()):
         uninstall=False,
         keep_build=False,
         help=False,
+        tui=None,  # True: --tui (the screen even on an update), False: --no-tui
         root="",
         bundle=None,
         json=False,
@@ -99,6 +100,8 @@ def parse_args(argv, parts=()):
                 errors.append("--progress only knows json")
         elif flag in ("--yes", "-y"):
             o.yes = True
+        elif flag in ("--tui", "--no-tui"):
+            o.tui = flag == "--tui"
         elif flag in FLAG_ATTR:
             setattr(o, FLAG_ATTR[flag], True)
         elif flag == "--style":
@@ -357,8 +360,8 @@ class Installer:
             "existing_install",
             msg="; ".join(ln for p in self.parts for ln in detect.notice(found[p.name], p.version, p.title)),
         )
-        if self.o.yes or self.o.json or self.o.from_package or self.o.dry_run:
-            return True
+        if self.o.yes or self.o.json or self.o.from_package or self.o.dry_run or getattr(self.o, "confirmed", False):
+            return True  # (confirmed: the screen's own summary was confirmed a moment ago)
         try:
             ans = self.ask("Continue? [Y/n] ").strip().lower()
         except EOFError:
@@ -552,7 +555,7 @@ def usage():
     return (
         "usage: material-boot core install [--with PART]... [--without PART]... [--only PART] [--yes] [--dry-run] [--force] [--from-package]\n"
         "           [--root DIR] [--bundle DIR] [--progress json] [--uninstall]\n"
-        "           [--style S] [--scheme dark|light] [--seed #RRGGBB] [--seed-mode multi|single] [--[no-]cookie] [--[no-]logo] [--[no-]hints]\n"
+        "           [--tui | --no-tui] [--style S] [--scheme dark|light] [--seed #RRGGBB] [--seed-mode multi|single] [--[no-]cookie] [--[no-]logo] [--[no-]hints]\n"
         "           [part options: --<part>-<name>, or --<name> when only one chosen part declares it]\n"
     )
 
@@ -583,6 +586,9 @@ def main(argv, say=print, ask=None):
         return 0
     # installed = a manifest in a plugin directory, or a part the state record knows (a half-removed part still counts: it has to be repaired or removed)
     installed = {p.name for p in plugins.discover()} | set((state.read(o.root) or {}).get("parts") or {})
+    if not errors and tui.wanted(o):
+        if not tui.run(parts, installed, o, say=say, inp=ask or input):
+            return 1
     chosen, notes, serr = select(parts, installed, o)
     errors += serr
     if not errors:
