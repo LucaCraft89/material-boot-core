@@ -151,3 +151,33 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with: {name: "bundle-smoke-${{ matrix.name }}", path: build/out/}
+
+  deps:
+    # The installer installs what it needs: a system with Python and nothing else (no Pillow, no SVG rasteriser) gets them from its own package manager.
+    # (The 1.0.0 bundle failed here on a real machine; the other jobs install these in their image setup, so they could not see it.)
+    name: Installs its own dependencies (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: Fedora, image: "registry.fedoraproject.org/fedora:latest"}
+          - {name: Debian, image: "docker.io/library/debian:stable"}
+          - {name: Ubuntu, image: "docker.io/library/ubuntu:24.04"}
+          - {name: Arch,   image: "docker.io/library/archlinux:latest"}
+          - {name: openSUSE, image: "registry.opensuse.org/opensuse/tumbleweed:latest"}
+    env:
+      PART_GRUB_REF: ${{ vars.PART_GRUB_REF || 'release/0.8.0' }}
+      PART_PLYMOUTH_REF: ${{ vars.PART_PLYMOUTH_REF || 'main' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: {repository: LucaCraft89/material-grub, ref: "${{ env.PART_GRUB_REF }}", path: parts-grub}
+      - uses: actions/checkout@v4
+        with: {repository: LucaCraft89/material-plymouth, ref: "${{ env.PART_PLYMOUTH_REF }}", path: parts-plymouth}
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil librsvg2-bin
+      - run: python3 scripts/build_bundle.py --out build/bundle --part grub=parts-grub --part plymouth=parts-plymouth
+      - run: |
+          mkdir -p build/out
+          docker run --rm -v "$PWD/build/bundle/material-boot-$(cat VERSION):/bundle:ro" -v "$PWD:/src:ro" -v "$PWD/build/out:/out" "${{ matrix.image }}" sh /src/tests/containers/deps_smoke.sh
+      - run: cat build/out/deps-smoke.txt; grep -q "^ALL OK" build/out/deps-smoke.txt

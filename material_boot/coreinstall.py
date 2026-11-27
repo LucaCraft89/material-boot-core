@@ -85,6 +85,39 @@ def missing_tools():
     return out
 
 
+# What the data build needs, by package manager: Pillow and something that rasterises SVG. (The old Material GRUB installer installed these too.)
+DEP_COMMANDS = {
+    "dnf": [["dnf", "install", "-y", "python3-pillow", "librsvg2-tools"]],
+    "apt-get": [["apt-get", "update"], ["apt-get", "install", "-y", "python3-pil", "librsvg2-bin"]],
+    "pacman": [["pacman", "-S", "--needed", "--noconfirm", "python-pillow", "librsvg"]],
+    "zypper": [["zypper", "--non-interactive", "install", "python3-Pillow", "rsvg-convert"]],
+    "apk": [["apk", "add", "py3-pillow", "rsvg-convert"]],
+    "xbps-install": [["xbps-install", "-Sy", "python3-Pillow", "librsvg-utils"]],
+}
+
+
+def install_missing_tools(root="", runner=None, env=None):
+    """Install what `missing_tools()` reports with the system's package manager. Returns (True, sentence) when nothing is missing afterwards, else (False, why).
+    Only on the real system: a staged root has no package manager to ask, and a distribution package declares its dependencies itself."""
+    runner = runner or subprocess.run
+    if root:
+        return False, "a staged root: nothing is installed"
+    pm = next((m for m in DEP_COMMANDS if shutil.which(m)), None)
+    if pm is None:
+        return False, "no supported package manager was found (dnf, apt-get, pacman, zypper, apk, xbps-install)"
+    env = dict(os.environ if env is None else env, DEBIAN_FRONTEND="noninteractive")
+    for cmd in DEP_COMMANDS[pm]:
+        if runner(cmd, env=env).returncode != 0:
+            return False, f"`{' '.join(cmd)}` failed"
+    import importlib
+
+    importlib.invalidate_caches()
+    left = missing_tools()
+    if left:
+        return False, "still missing for this Python (" + sys.executable + "): " + ", ".join(left)
+    return True, f"installed the build dependencies with {pm}"
+
+
 def swap_dir(new, dst):
     """Put the directory `new` in place of `dst`; the old one is kept until the new one is there, and put back if the rename fails."""
     new, dst = Path(new), Path(dst)
@@ -204,16 +237,35 @@ def hook_plan(ctx):
     out.append(f"create {p / 'plugins.d'} for the parts' manifests")
     gone = missing_tools()
     if gone:
-        out.append("MISSING, the data cannot be built until these are installed: " + ", ".join(gone))
+        out.append(
+            "MISSING: "
+            + ", ".join(gone)
+            + (
+                " (installed with the package manager)"
+                if ctx.how != "package" and not ctx.root
+                else ": install them, the data cannot be built without"
+            )
+        )
     return out
 
 
 def hook_install(ctx):
     p = prefix(ctx.root)
     gone = missing_tools()
+    notes, copied = [], False
+    if gone and not ctx.dry_run and ctx.how != "package":
+        ok, what = install_missing_tools(ctx.root)
+        if ok:
+            notes.append(what)
+            gone = []
+        else:
+            raise RuntimeError(
+                "cannot build the shared data, missing: "
+                + ", ".join(gone)
+                + f" ({what}); install them and run this again"
+            )
     if gone:
         raise RuntimeError("cannot build the shared data, missing: " + ", ".join(gone))
-    notes, copied = [], False
     src = Path(ctx.source) if ctx.source else None
     if ctx.how != "package" and src is not None:
         if not (src / "lib/material_boot").is_dir():
