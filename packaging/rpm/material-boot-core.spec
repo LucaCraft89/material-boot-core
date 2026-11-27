@@ -1,7 +1,7 @@
 # The RPM ships the library, the command and the build inputs; the shared data (palettes, glyphs, the font) is built on the target machine in %posttrans,
 # for the configured scheme (material-boot core install --from-package --only core), so nothing prebuilt is downloaded. COPR builds this spec from the tag.
 Name:           material-boot-core
-Version:        1.0.1
+Version:        1.1.0
 Release:        1%{?dist}
 Summary:        The code and the command that Material GRUB and Material Plymouth share
 License:        MIT
@@ -40,6 +40,9 @@ if [ $1 -eq 0 ]; then /usr/bin/material-boot core install --from-package --unins
 %dir %{_datadir}/material-boot/plugins.d
 
 %changelog
+* Fri Nov 27 2026 LucaCraft89 <noreply@users.noreply.github.com> - 1.1.0-1
+- The installer screen: parts checklist, the shared look with a preview, each part's questions (install.questions).
+
 * Fri Nov 27 2026 LucaCraft89 <noreply@users.noreply.github.com> - 1.0.1-1
 - install.sh uses the distribution's python3; the installer installs the build dependencies it needs.
 

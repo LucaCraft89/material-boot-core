@@ -2,7 +2,7 @@
 # The package ships the library, the command and the build inputs; the shared data is built on the target machine by the install script
 # (post_install / post_upgrade), for the configured scheme. Not published on the AUR yet.
 pkgname=material-boot-core
-pkgver=1.0.1
+pkgver=1.1.0
 pkgrel=1
 pkgdesc='The code and the command that Material GRUB and Material Plymouth share'
 arch=('any')
