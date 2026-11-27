@@ -1,0 +1,9 @@
+Material Boot installer   step 3 of 11
+
+Colour scheme
+
+ > (*) Dark
+        Deep Material 3 surfaces, easy on the eyes in a dark room.
+   ( ) Light
+
+Up/Down move  Enter select  Esc back  q quit

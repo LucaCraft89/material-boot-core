@@ -82,6 +82,70 @@ def _clean_menu(menu, name, warnings):
     return out
 
 
+QUESTION_KINDS = ("choice", "toggle", "text")
+QUESTION_ID = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
+
+
+def read_questions(raw, options, part, warnings):
+    """The questions a part asks on the installer screen (docs/plugins.md, `install.questions`): [{id, title, kind, help, default, options, allow_text,
+    target, when}]. A malformed one is dropped with a warning; a target must be an installer option the part declares, or a settings key (conf)."""
+    out = []
+    if raw is None:
+        return out
+    if not isinstance(raw, list):
+        warnings.append(f"{part}: install.questions must be a list")
+        return out
+    declared = {o["name"] for o in options}
+    seen = set()
+    for q in raw:
+        ok = isinstance(q, dict) and isinstance(q.get("id"), str) and QUESTION_ID.match(q["id"]) and q["id"] not in seen
+        ok = ok and q.get("kind") in QUESTION_KINDS and isinstance(q.get("title"), str) and q["title"].strip() != ""
+        tgt = q.get("target") if ok else None
+        ok = (
+            ok
+            and isinstance(tgt, dict)
+            and (
+                (isinstance(tgt.get("option"), str) and tgt["option"] in declared)
+                or (isinstance(tgt.get("conf"), str) and re.match(r"^[A-Z][A-Z_]{1,31}$", tgt["conf"]))
+            )
+        )
+        if not ok:
+            warnings.append(f"{part}: an install question is malformed and was ignored")
+            continue
+        seen.add(q["id"])
+        opts = []
+        for x in q.get("options", []) if isinstance(q.get("options"), list) else []:
+            if isinstance(x, dict) and isinstance(x.get("value"), str) and isinstance(x.get("label"), str):
+                opts.append({"value": x["value"], "label": x["label"][:80], "help": str(x.get("help", ""))[:300]})
+        if q["kind"] == "choice" and not opts:
+            warnings.append(f"{part}: the choice question '{q['id']}' has no options and was ignored")
+            continue
+        pattern = q.get("pattern")
+        if pattern is not None:
+            try:
+                re.compile(pattern)
+                pattern = pattern if isinstance(pattern, str) and len(pattern) <= 100 else None
+            except (re.error, TypeError):
+                pattern = None
+        when = q.get("when", "fresh")
+        out.append(
+            {
+                "id": q["id"],
+                "title": q["title"][:60],
+                "kind": q["kind"],
+                "help": str(q.get("help", ""))[:600],
+                "default": q.get("default", "" if q["kind"] != "toggle" else False),
+                "options": opts,
+                "allow_text": q.get("allow_text") is True,
+                "pattern": pattern,
+                "target": {k: tgt[k] for k in ("option", "conf") if k in tgt},
+                "when": when if when in ("fresh", "always") else "fresh",
+            }
+        )
+    seen.clear()
+    return out
+
+
 def read_manifest(path, core_version=None):
     """One manifest file -> a part record (SimpleNamespace). `problem` is None when the part is usable, else a sentence for `doctor`;
     `warnings` are things that were ignored. Never raises."""
@@ -99,6 +163,7 @@ def read_manifest(path, core_version=None):
         default=False,
         needs=[],
         options=[],
+        questions=[],
         layouts=[],
         package=None,
         source=None,
@@ -192,6 +257,7 @@ def read_manifest(path, core_version=None):
             )
         else:
             p.warnings.append(f"{name}: an install option is malformed and was ignored")
+    p.questions = read_questions(inst.get("questions"), p.options, name, p.warnings)
     needs = inst.get("needs", [])
     if isinstance(needs, list) and all(isinstance(n, str) and (n == "core" or NAME.match(n)) for n in needs):
         p.needs = [

@@ -1,0 +1,37 @@
+Material Boot installer   step 4 of 11
+
+Colours
+One colour for the whole theme, or every distro in its own colour.
+
+ > (*) Every entry its own colour                                 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+        The default: each distro keeps the colour of its brand    ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+        (Fedora blue, Ubuntu orange, Debian red, ...), so the     ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+        entries tell apart at a glance.                           ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   ( ) ██ Crimson  #C62828                                        ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   ( ) ██ Cherry  #E53935                                         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   ( ) ██ Coral  #FF7043                                          ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   ( ) ██ Peach  #FF8A65                                          ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+   ( ) ██ Tangerine  #E95420                                        shown in Forest; each entry keeps its own colour
+   ( ) ██ Orange  #FB8C00
+   ( ) ██ Amber  #FFB300
+   ( ) ██ Gold  #FBC02D
+   ( ) ██ Lime  #8BC34A
+   ( ) ██ Moss  #689F38
+   ( ) ██ Pine  #1B5E20
+   ( ) ██ Forest  #0B3D2E
+   ( ) ██ Emerald  #00A86B
+   ( ) ██ Teal  #00897B
+   ( ) ██ Turquoise  #00ACC1
+   ( ) ██ Ice  #80DEEA
+   ( ) ██ Sky  #29B6F6
+   ( ) ██ Ocean  #0288D1
+   ( ) ██ Cobalt  #1565C0
+   ( ) ██ Navy  #283593
+   ( ) ██ Indigo  #3949AB
+   ( ) ██ Violet  #5E35B1
+   ( ) ██ Lavender  #7E57C2
+   ( ) ██ Purple  #8E24AA
+   ( ) ██ Plum  #6A1B9A
+   ... more below
+
+Up/Down move  Enter select  Esc back  q quit

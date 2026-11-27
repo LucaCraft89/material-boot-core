@@ -1,0 +1,12 @@
+Material Boot installer   step 2 of 11
+
+Style
+
+ > (*) Full screen with a left rail
+        The default: a big hero panel for the selected entry and a rail of
+        icons on the left, grouped Linux | Windows | System.
+   ( ) Full screen, no rail
+   ( ) Centered list
+   ( ) Split: hero left, list right
+
+Up/Down move  Enter select  Esc back  q quit

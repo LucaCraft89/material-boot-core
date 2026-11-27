@@ -60,6 +60,7 @@ def part():
         default=True,
         needs=[],
         options=[],
+        questions=[],
         layouts=[],
         package="material-boot-core",
         source=None,
