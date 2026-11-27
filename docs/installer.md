@@ -99,7 +99,7 @@ material-boot-<version>/
 - **The build is reproducible**: entries sorted, owner 0, one fixed time (`--epoch`, `$SOURCE_DATE_EPOCH`, else the last commit), gzip without a time stamp. `BUNDLE.json` records the commit and the version of every part; `SHA256SUMS` covers every file.
 - **`install.sh`** verifies `SHA256SUMS` (`--no-verify` skips it), finds a Python 3.9+ (or says which package to install), asks sudo itself when it needs root (there is no `material-boot` command yet to ask again), and runs `python -m material_boot core install --bundle <the tree>` with the library from the bundle.
 
-Not built yet: the core's own packages (C5c), a bundle of real parts (they get their manifests in G2 and P2), and the release workflow that attaches the tarball to a tag.
+The release workflow (`.github/workflows/release.yml`, run by hand) builds the bundle from the tags in `bundle.json` and attaches it, with its checksum, to the GitHub Release.
 
 ## The core's packages (implemented: `packaging/`, `tests/containers/`)
 
