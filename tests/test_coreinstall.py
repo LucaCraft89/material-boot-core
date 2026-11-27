@@ -203,6 +203,69 @@ class NoBuild(unittest.TestCase):
             self.assertIn("missing: Pillow", str(e.exception))
             self.assertFalse(ci.prefix(root).exists())
 
+    def test_missing_tools_are_installed_with_the_package_manager_on_a_real_system(self):
+        calls = []
+
+        def runner(cmd, env=None):
+            calls.append(cmd)
+            return mock.Mock(returncode=0)
+
+        with (
+            mock.patch.object(ci.shutil, "which", side_effect=lambda m: "/usr/bin/" + m if m == "dnf" else None),
+            mock.patch.object(ci, "missing_tools", return_value=[]),  # found once the package manager has run
+        ):
+            ok, what = ci.install_missing_tools("", runner=runner)
+        self.assertTrue(ok, what)
+        self.assertEqual(calls, [["dnf", "install", "-y", "python3-pillow", "librsvg2-tools"]])
+        self.assertIn("dnf", what)
+
+    def test_a_failing_package_manager_is_reported(self):
+        with mock.patch.object(ci.shutil, "which", side_effect=lambda m: "/usr/bin/" + m if m == "apt-get" else None):
+            ok, what = ci.install_missing_tools("", runner=lambda cmd, env=None: mock.Mock(returncode=100))
+        self.assertFalse(ok)
+        self.assertIn("apt-get update", what)  # the first command is the one that failed
+
+    def test_still_missing_after_the_install_says_which_python(self):
+        with (
+            mock.patch.object(ci.shutil, "which", side_effect=lambda m: "/usr/bin/" + m if m == "dnf" else None),
+            mock.patch.object(ci, "missing_tools", return_value=["Pillow (python3-pillow)"]),
+        ):
+            ok, what = ci.install_missing_tools("", runner=lambda cmd, env=None: mock.Mock(returncode=0))
+        self.assertFalse(ok)
+        self.assertIn(sys.executable, what)
+
+    def test_without_a_package_manager_or_on_a_staged_root_nothing_runs(self):
+        ran = []
+        runner = lambda cmd, env=None: ran.append(cmd)  # noqa: E731
+        with mock.patch.object(ci.shutil, "which", return_value=None):
+            self.assertFalse(ci.install_missing_tools("", runner=runner)[0])
+        self.assertFalse(ci.install_missing_tools("/some/root", runner=runner)[0])
+        self.assertEqual(ran, [])
+
+    def test_the_hook_installs_what_is_missing_before_it_gives_up(self):
+        with (
+            tempfile.TemporaryDirectory() as t,
+            mock.patch.object(ci, "missing_tools", return_value=["Pillow (python3-pillow)"]),
+            mock.patch.object(
+                ci, "install_missing_tools", return_value=(True, "installed the build dependencies with dnf")
+            ) as inst,
+            mock.patch.object(ci, "build_data"),
+        ):
+            r = ci.hook_install(ctx(Path(t) / "root", make_bundle(Path(t) / "b")))
+        inst.assert_called_once()
+        self.assertIn("installed the build dependencies with dnf", r["notes"])
+
+    def test_a_dry_run_and_a_package_never_install_anything(self):
+        for kw in ({"dry": True}, {"how": "package"}):
+            with (
+                tempfile.TemporaryDirectory() as t,
+                mock.patch.object(ci, "missing_tools", return_value=["Pillow (python3-pillow)"]),
+                mock.patch.object(ci, "install_missing_tools") as inst,
+            ):
+                with self.assertRaises(RuntimeError):
+                    ci.hook_install(ctx(Path(t) / "root", make_bundle(Path(t) / "b"), **kw))
+            inst.assert_not_called()
+
     def test_the_plan_names_what_is_missing(self):
         with (
             tempfile.TemporaryDirectory() as t,
