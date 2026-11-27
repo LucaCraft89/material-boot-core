@@ -88,6 +88,13 @@ def add_part(stage, name, spec, local, release, work):
         )
     dest = stage / "parts" / name
     commit = export(local[name], dest) if name in local else fetch(spec["repo"], ref, dest, work)
+    for rel in spec.get(
+        "exclude", []
+    ):  # what a bundle does not need (screenshots, tests): the part's repository keeps it, the bundle does not carry it
+        target = (dest / rel).resolve()
+        if dest.resolve() not in target.parents or target == (dest / PART_MANIFEST).resolve():
+            raise SystemExit(f"the part '{name}': exclude '{rel}' is outside the part or is its manifest")
+        shutil.rmtree(target) if target.is_dir() else target.unlink(missing_ok=True)
     src = dest / PART_MANIFEST
     if not src.is_file():
         raise SystemExit(f"the part '{name}' has no {PART_MANIFEST} at the root of its repository")
