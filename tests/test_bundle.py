@@ -268,11 +268,14 @@ class Refusals(Base):
             self.build()
         self.assertIn("unknown format", str(e.exception))
 
-    def test_the_real_bundle_json_is_valid_and_pins_branches_until_the_tags_exist(self):
+    def test_the_real_bundle_json_is_valid_and_pins_tags(self):
         cfg = json.loads((ROOT / "bundle.json").read_text())
         self.assertEqual(cfg["format"], 1)
         self.assertEqual(sorted(cfg["parts"]), ["grub", "plymouth"])
-        self.assertTrue(all("/" in p["repo"] and p["ref"] for p in cfg["parts"].values()))
+        for name, p in cfg["parts"].items():
+            self.assertIn("/", p["repo"], name)
+            # a release is built from tags only (build_bundle.py --release refuses anything else)
+            self.assertRegex(p["ref"], r"^v\d+\.\d+\.\d+$", name)
 
 
 class Installer(Base):
