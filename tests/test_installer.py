@@ -323,7 +323,7 @@ class Run(Base):
             self.hooks_of("install", core=True)[0], "core"
         )  # every part needs the core, which is installed first
         st = state.read(str(self.rootdir))
-        self.assertEqual(st["parts"], {"core": "1.0.0", "alpha": "1.0.0", "omega": "1.0.0"})
+        self.assertEqual(st["parts"], {"core": material_boot.__version__, "alpha": "1.0.0", "omega": "1.0.0"})
         self.assertEqual(st["version"], material_boot.__version__)
         self.assertIn("Installed: core, omega, alpha.", out)
 

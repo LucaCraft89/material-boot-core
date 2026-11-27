@@ -34,9 +34,17 @@ if [ "$verify" = 1 ] && [ -f "$HERE/SHA256SUMS" ]; then
   fi
 fi
 
+# The distribution's own `python3` comes first: that is the interpreter its python3-pillow package belongs to (a separate python3.13 beside it often has no
+# Pillow). First an interpreter 3.9+ that can import Pillow, then, when there is none, any 3.9+ (the installer says what is missing).
 PY=
-for c in python3.13 python3.12 python3.11 python3.10 python3.9 python3; do
-  if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>/dev/null; then PY=$c; break; fi
+for need_pil in 1 0; do
+  for c in python3 python3.13 python3.12 python3.11 python3.10 python3.9; do
+    command -v "$c" >/dev/null 2>&1 || continue
+    "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>/dev/null || continue
+    if [ "$need_pil" = 1 ]; then "$c" -c 'import PIL' 2>/dev/null || continue; fi
+    PY=$c; break
+  done
+  [ -n "$PY" ] && break
 done
 if [ -z "$PY" ]; then
   cat >&2 <<'MSG'
