@@ -610,37 +610,52 @@ def _rect(g, x, y, w, h, c):
             g[yy][xx] = c
 
 
+def mix(a, b, t):
+    """'#RRGGBB' a moved t of the way to b: tones between the surface and the text, visible on any scheme."""
+    pa, pb = (tuple(int(c[i : i + 2], 16) for i in (1, 3, 5)) for c in (a, b))
+    r, g, b = (round(x + (y - x) * t) for x, y in zip(pa, pb))
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
+def _box(g, x, y, w, h, fill, line):
+    """A panel with a one-pixel outline, so it reads on any scheme (the dark ones are nearly black on black)."""
+    _rect(g, x, y, w, h, line)
+    _rect(g, x + 1, y + 1, w - 2, h - 2, fill)
+
+
 def mock_scene(style, roles):
     """A stylised drawing of the chosen style in the chosen colours: the layout of the real theme, not its pixels."""
     g = _grid(roles["surface"])
-    pc, sc, hi, tx = (
-        roles["primaryContainer"],
-        roles["secondaryContainer"],
-        roles["surfaceContainerHigh"],
-        roles["onSurface"],
-    )
+    pc, tx = roles["primaryContainer"], roles["onSurface"]
+    hi, pill, ln = (mix(roles["surface"], tx, t) for t in (0.10, 0.20, 0.32))
     if style == "clean":
-        _rect(g, 6, 0, 18, 3, sc)
-        _rect(g, 3, 4, 24, 8, pc)
-        _rect(g, 6, 6, 10, 1, tx)
-        _rect(g, 6, 8, 14, 1, roles["onPrimaryContainer"])
-        _rect(g, 6, 13, 18, 3, sc)
+        _box(g, 6, 0, 18, 3, hi, ln)
+        _box(g, 2, 4, 26, 8, hi, ln)
+        _rect(g, 5, 6, 8, 4, roles["primary"])
+        _rect(g, 15, 6, 10, 1, tx)
+        _rect(g, 15, 8, 7, 1, roles["onSurfaceVariant"])
+        _box(g, 6, 13, 18, 3, hi, ln)
     elif style == "list":
         for n in range(5):
-            _rect(g, 6, 1 + n * 3, 18, 2, pc if n == 2 else roles["surfaceContainer"])
-            _rect(g, 7, 1 + n * 3, 2, 2, roles["primary"])
+            _rect(g, 5, 1 + n * 3, 20, 2, pc if n == 2 else pill)
+            _rect(g, 7, 1 + n * 3, 2, 2, roles["primary"] if n != 2 else roles["onPrimaryContainer"])
+            _rect(g, 11, 1 + n * 3, 9, 1, tx if n != 2 else roles["onPrimaryContainer"])
     elif style == "split":
-        _rect(g, 2, 3, 10, 10, roles["primary"])
-        _rect(g, 2, 14, 10, 1, tx)
+        _box(g, 1, 2, 12, 11, hi, ln)
+        _rect(g, 4, 4, 6, 5, roles["primary"])
+        _rect(g, 3, 10, 8, 1, tx)
         for n in range(4):
-            _rect(g, 15, 1 + n * 4, 13, 3, pc if n == 1 else roles["surfaceContainer"])
+            _rect(g, 15, 1 + n * 4, 14, 3, pc if n == 1 else pill)
+            _rect(g, 17, 2 + n * 4, 2, 1, roles["primary"] if n != 1 else roles["onPrimaryContainer"])
+            _rect(g, 21, 2 + n * 4, 6, 1, tx if n != 1 else roles["onPrimaryContainer"])
     else:  # rail
         for n in range(4):
-            _rect(g, 1, 1 + n * 4, 3, 3, pc if n == 1 else sc)
-        _rect(g, 6, 1, 23, 13, hi)
-        _rect(g, 9, 3, 7, 5, roles["primary"])
-        _rect(g, 9, 10, 13, 1, tx)
-    _rect(g, 8, 15, 14, 1, roles["outline"])
+            _rect(g, 1, 1 + n * 4, 4, 3, pc if n == 1 else pill)
+        _box(g, 7, 1, 22, 13, hi, ln)
+        _rect(g, 10, 3, 7, 5, roles["primary"])
+        _rect(g, 10, 10, 13, 1, tx)
+        _rect(g, 10, 12, 8, 1, roles["onSurfaceVariant"])
+    _rect(g, 8, 15, 14, 1, ln)
     return g
 
 
