@@ -319,6 +319,37 @@ class Installer(Base):
         r = self.sh("--no-verify", "--dry-run", "--root", str(self.root))
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
+    def fake_pythons(self, **has_pil):
+        """A bin directory with fake interpreters (name=True: it can import Pillow). Each one records its name in $MARK when it is asked to run the installer."""
+        bin_ = self.d / "pybin"
+        bin_.mkdir()
+        for tool in ("dirname", "id", "cat"):
+            shutil.copy(shutil.which(tool), bin_ / tool)
+        for name, pil in has_pil.items():
+            f = bin_ / name.replace("_", ".")
+            f.write_text(
+                f'#!/bin/sh\ncase "$*" in *PIL*) exit {0 if pil else 1};; *version_info*) exit 0;; esac\necho {f.name} > "$MARK"\n'
+            )
+            f.chmod(0o755)
+        return bin_
+
+    def which_python(self, **has_pil):
+        bin_ = self.fake_pythons(**has_pil)
+        mark = self.d / "mark"
+        r = self.sh("--no-verify", "--dry-run", path=str(bin_), env={"MARK": str(mark)})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        return mark.read_text().strip()
+
+    def test_the_default_python3_wins_over_a_versioned_one_without_pillow(self):
+        # a Fedora with a separate python3.13 beside the python3 that has the distribution's Pillow: it chose python3.13 and failed on the missing Pillow
+        self.assertEqual(self.which_python(python3=True, python3_13=False), "python3")
+
+    def test_a_versioned_python_with_pillow_is_used_when_python3_has_none(self):
+        self.assertEqual(self.which_python(python3=False, python3_12=True), "python3.12")
+
+    def test_without_pillow_anywhere_the_first_python_is_used_and_the_installer_says_what_is_missing(self):
+        self.assertEqual(self.which_python(python3=False, python3_13=False), "python3")
+
     def test_no_python_is_a_clear_message(self):
         bin_ = self.d / "bin"
         bin_.mkdir()
