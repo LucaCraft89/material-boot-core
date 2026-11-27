@@ -902,6 +902,9 @@ def run(parts, installed, o, say=print, inp=input, plain=None, tty=None):
                 import curses  # noqa: F401
             except ImportError:
                 use_plain = True
+                say(
+                    "(this Python has no curses module, so the questions are plain prompts; openSUSE: zypper install python3-curses)"
+                )
     if use_plain:
         r = run_plain(flow, inp, say)
     else:

@@ -526,6 +526,36 @@ class Plain(unittest.TestCase):
         self.assertIn("Ready to install:", text)
         self.assertIn("material-boot core install --with grub,plymouth", text)
 
+    def test_a_python_without_curses_says_so_and_asks_plainly(self):
+        o = options(
+            "--with",
+            "grub",
+            "--style",
+            "rail",
+            "--scheme",
+            "dark",
+            "--seed-mode",
+            "multi",
+            "--no-cookie",
+            "--no-logo",
+            "--no-hints",
+        )
+        out = io.StringIO()
+        answers = iter(
+            ["", "", "", "", "", "y"]
+        )  # res, raw names, countdown, timeout, editor are all the defaults; then Install
+        with (
+            redirect_stdout(out),
+            mock.patch.dict(sys.modules, {"curses": None}),  # `import curses` raises ImportError
+            mock.patch.dict(os.environ, {"TERM": "xterm-256color"}),
+            mock.patch.object(sys.stdin, "isatty", return_value=True),
+            mock.patch.object(sys.stdout, "isatty", return_value=True),
+        ):
+            ok = tui.run(make_parts(), set(), o, say=print, inp=lambda prompt="": next(answers))
+        self.assertTrue(ok, out.getvalue())
+        self.assertIn("no curses module", out.getvalue())
+        self.assertIn("Ready to install:", out.getvalue())
+
     def test_q_cancels_and_changes_nothing(self):
         ok, o, text = self.run_plain(["q"])
         self.assertFalse(ok)

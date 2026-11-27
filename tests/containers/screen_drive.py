@@ -15,9 +15,10 @@ ROWS, COLS = 40, 120
 DOWN, ENTER = "\x1bOB", "\r"
 m, s = pty.openpty()
 fcntl.ioctl(s, termios.TIOCSWINSZ, struct.pack("HHHH", ROWS, COLS, 0, 0))
-env = dict(
-    os.environ, TERM="xterm-256color", LINES=str(ROWS), COLUMNS=str(COLS), MATERIAL_BOOT_TUI_REPAINT="1"
-)  # a full repaint each frame: curses would send only what changed
+# SCREEN_PLAIN=1 asks for a terminal without curses (TERM=dumb): the plain numbered prompts, as on a Python without the curses module
+term = "dumb" if os.environ.get("SCREEN_PLAIN") == "1" else "xterm-256color"
+# MATERIAL_BOOT_TUI_REPAINT: a full repaint each frame, because curses would send only what changed
+env = dict(os.environ, TERM=term, LINES=str(ROWS), COLUMNS=str(COLS), MATERIAL_BOOT_TUI_REPAINT="1")
 proc = subprocess.Popen(["sh", "/bundle/install.sh"], stdin=s, stdout=s, stderr=s, env=env, close_fds=True)
 os.close(s)
 seen = b""
@@ -40,7 +41,7 @@ def pump(t):
     return True
 
 
-def wait(text, timeout=900):
+def wait(text, timeout=240):
     """Wait for `text` to appear in what was printed AFTER the last thing we waited for."""
     global pos
     end = time.time() + timeout
@@ -62,33 +63,58 @@ def send(keys):
     time.sleep(0.3)
 
 
-wait("What to install")
-send(ENTER)  # Material GRUB is ticked (the default part)
-wait("Full screen with a left rail")
-send(DOWN + DOWN + ENTER)  # list
-wait("Colour scheme")
-send(ENTER)  # dark
-wait("Every entry its own colour")
-send(ENTER)  # multi
-wait("Cookie and firmware logo")
-send(ENTER)
-wait("Key hints")
-send(ENTER)
-wait("Screen resolution")
-send(ENTER)  # detected automatically
-wait("Raw entry name line")
-send(ENTER)
-wait("Countdown bar")
-send(DOWN + ENTER)  # No
-wait("Timeout in seconds")
-send(ENTER)  # start typing
-send("7")
-send(ENTER)
-wait("Graphical editor")
-send(ENTER)  # No
-wait("Ready to install")
-send(ENTER)  # Install
-wait("Installed: core, grub")
+wait("What to install", 240)
+pump(1.5)
+curses_mode = (
+    b"step 1 of" in seen
+)  # the header of the curses screen; the plain prompts have none (python3 without the curses module: openSUSE's)
+print("screen mode:", "curses" if curses_mode else "plain prompts")
+if curses_mode:
+    send(ENTER)  # Material GRUB is ticked (the default part)
+    wait("Full screen with a left rail", 120)
+    send(DOWN + DOWN + ENTER)  # list
+    wait("Colour scheme", 120)
+    send(ENTER)  # dark
+    wait("Every entry its own colour", 120)
+    send(ENTER)  # multi
+    wait("Cookie and firmware logo", 120)
+    send(ENTER)
+    wait("Key hints", 120)
+    send(ENTER)
+    wait("Screen resolution", 120)
+    send(ENTER)  # detected automatically
+    wait("Raw entry name line", 120)
+    send(ENTER)
+    wait("Countdown bar", 120)
+    send(DOWN + ENTER)  # No
+    wait("Timeout in seconds", 120)
+    send(ENTER)  # start typing
+    send("7")
+    send(ENTER)
+    wait("Graphical editor", 120)
+    send(ENTER)  # No
+    wait("Ready to install", 120)
+    send(ENTER)  # Install
+else:
+    # the same choices as numbers and lines: an empty line takes the marked answer
+    send("\n")  # the parts: Material GRUB is marked
+    for title, answer in (
+        ("Style", "3"),  # list
+        ("Colour scheme", ""),
+        ("Colours", ""),
+        ("Cookie and firmware logo", ""),
+        ("Key hints", ""),
+        ("Screen resolution", ""),
+        ("Raw entry name line", ""),
+        ("Countdown bar", "2"),  # No
+        ("Timeout in seconds", "7"),
+        ("Graphical editor", ""),
+    ):
+        wait(title, 120)
+        send(answer + "\n")
+    wait("Ready to install", 120)
+    send("y\n")
+wait("Installed: core, grub", 600)
 pump(2)
 proc.wait(timeout=60)
 print("SCREEN OK" if proc.returncode == 0 else f"exit status {proc.returncode}")

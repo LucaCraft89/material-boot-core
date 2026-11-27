@@ -102,7 +102,7 @@ s = json.load(open("/var/lib/material-grub/state.json"))
 assert set(s["parts"]) == {"core"}, s
 PY
 say "== the screen: a person at a terminal installs GRUB with the keyboard"
-python3 /src/tests/containers/screen_drive.py > /tmp/screen.log 2>&1 && say "the screen installed GRUB" || { say "the screen run FAILED"; tail -60 /tmp/screen.log | tee -a $R; exit 1; }
+python3 /src/tests/containers/screen_drive.py > /tmp/screen.log 2>&1 && say "the screen installed GRUB ($(grep '^screen mode' /tmp/screen.log))" || { say "the screen run FAILED"; tail -60 /tmp/screen.log | tee -a $R; exit 1; }
 grep -q "^STYLE=list" /etc/material-grub.conf && say "the style chosen on the screen is in the settings" || { say "STYLE=list is not in the settings"; cat /etc/material-grub.conf | tee -a $R; exit 1; }
 grep -q "^COUNTDOWN=off" /etc/material-grub.conf && say "the countdown bar answer is in the settings" || { say "COUNTDOWN=off is missing"; cat /etc/material-grub.conf | tee -a $R; exit 1; }
 grep -q "^TIMEOUT=7" /etc/material-grub.conf && say "the typed timeout is in the settings" || { say "TIMEOUT=7 is missing"; cat /etc/material-grub.conf | tee -a $R; exit 1; }
