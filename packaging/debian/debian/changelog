@@ -1,3 +1,10 @@
+material-boot-core (1.0.1) unstable; urgency=medium
+
+  * install.sh uses the distribution's python3 (one that can import Pillow) and
+    the installer installs the build dependencies it needs.
+
+ -- LucaCraft89 <noreply@users.noreply.github.com>  Fri, 27 Nov 2026 12:00:00 +0000
+
 material-boot-core (1.0.0) unstable; urgency=medium
 
   * Release 1.0.0.
