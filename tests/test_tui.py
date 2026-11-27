@@ -554,7 +554,7 @@ class RealTerminal(unittest.TestCase):
 
         m, sl = pty.openpty()
         fcntl.ioctl(sl, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
-        env = dict(os.environ, TERM="xterm-256color", LINES=str(rows), COLUMNS=str(cols))
+        env = dict(os.environ, TERM="xterm-256color", LINES=str(rows), COLUMNS=str(cols), MATERIAL_BOOT_TUI_REPAINT="1")
         proc = subprocess.Popen(
             [sys.executable, "-c", self.CODE, *argv], stdin=sl, stdout=sl, stderr=sl, env=env, close_fds=True
         )
@@ -760,6 +760,35 @@ class InTheInstaller(InstallerBase):
         self.assertEqual(inst["grub"]["options"], {"res": "1920x1080"})
         self.assertEqual(inst["plymouth"]["options"], {"no-cmdline": True})
         self.assertEqual(inst["grub"]["style"], "split")
+
+    def test_the_summary_is_the_confirmation_so_the_installer_does_not_ask_again(self):
+        # core and grub are installed already: the installer prints the notice of the existing install, but `Continue?` would be asked twice
+        from material_boot import state
+
+        state.record(str(self.rootdir), "1.0.0", "source", "normal", parts={"core": "1.0.0", "grub": "1.0.0"})
+        self.part("grub", install={"default": True, "options": [], "questions": []})
+        out = io.StringIO()
+        with (
+            redirect_stdout(out),
+            # the parts step, then the summary: there is no third answer to give
+            mock.patch("builtins.input", side_effect=["", "y"]) as asked,
+            mock.patch.object(tui, "wanted", return_value=True),
+        ):
+            rc = installer.main(["--bundle", str(self.bundle), "--root", str(self.rootdir)])
+        self.assertEqual(rc, 0, out.getvalue())
+        self.assertIn("Existing install", out.getvalue())
+        self.assertFalse([c for c in asked.call_args_list if "Continue?" in str(c)], asked.call_args_list)
+
+    def test_without_the_screen_the_installer_still_asks_continue(self):
+        from material_boot import state
+
+        state.record(str(self.rootdir), "1.0.0", "source", "normal", parts={"core": "1.0.0", "grub": "1.0.0"})
+        self.part("grub", install={"default": True, "options": []})
+        out = io.StringIO()
+        with redirect_stdout(out), mock.patch("builtins.input", side_effect=["y"]) as asked:
+            rc = installer.main(["--bundle", str(self.bundle), "--root", str(self.rootdir)])
+        self.assertEqual(rc, 0, out.getvalue())
+        self.assertTrue([c for c in asked.call_args_list if "Continue?" in str(c)], asked.call_args_list)
 
     def test_cancelling_the_screen_installs_nothing(self):
         rc, out = self.run_screen(["q"])

@@ -763,7 +763,8 @@ def run_curses(flow):
 
         while True:
             h, w = scr.getmaxyx()
-            scr.erase()
+            # curses sends only the cells that changed, which splits the texts a test is waiting for: MATERIAL_BOOT_TUI_REPAINT=1 repaints everything every time
+            scr.clear() if os.environ.get("MATERIAL_BOOT_TUI_REPAINT") == "1" else scr.erase()
             if h < 12 or w < 50:
                 scr.addstr(0, 0, "Make the terminal bigger (50x12 at least), or q to quit"[: w - 1])
             else:
@@ -911,4 +912,5 @@ def run(parts, installed, o, say=print, inp=input, plain=None, tty=None):
         say("nothing changed")
         return False
     flow.apply(o)
+    o.confirmed = True  # the summary was the confirmation: the installer does not ask `Continue?` again
     return True

@@ -360,8 +360,8 @@ class Installer:
             "existing_install",
             msg="; ".join(ln for p in self.parts for ln in detect.notice(found[p.name], p.version, p.title)),
         )
-        if self.o.yes or self.o.json or self.o.from_package or self.o.dry_run:
-            return True
+        if self.o.yes or self.o.json or self.o.from_package or self.o.dry_run or getattr(self.o, "confirmed", False):
+            return True  # (confirmed: the screen's own summary was confirmed a moment ago)
         try:
             ans = self.ask("Continue? [Y/n] ").strip().lower()
         except EOFError:
