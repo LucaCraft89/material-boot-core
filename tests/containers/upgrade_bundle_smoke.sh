@@ -25,8 +25,13 @@ sh install.sh --dry-run > /tmp/dry.log 2>&1 && say "dry run: ok" || { say "dry r
 grep -q "remove /usr/local/bin/material-grub" /tmp/dry.log && grep -q "remove /usr/share/material-grub-gui" /tmp/dry.log && say "the plan names the old command and the old editor" || { say "the plan does not name the leftovers"; cat /tmp/dry.log | tee -a $R; exit 1; }
 snap > /tmp/s1; cmp -s /tmp/s0 /tmp/s1 && say "SYSTEM UNCHANGED by the dry run" || { say "the dry run changed the system"; diff /tmp/s0 /tmp/s1 | head | tee -a $R; exit 1; }
 
-say "== the update"
-sh install.sh --yes > /tmp/up.log 2>&1 && say "update: ok" || { say "update FAILED"; tail -60 /tmp/up.log | tee -a $R; exit 1; }
+say "== the update (${UPDATE_VIA:-yes})"
+case ${UPDATE_VIA:-yes} in
+  screen-keep|screen-edit)  # a person at a terminal: the screen, with the keyboard
+    python3 /src/tests/containers/screen_update_drive.py "${UPDATE_VIA#screen-}" > /tmp/up.log 2>&1 && say "update through the screen ($UPDATE_VIA): ok" || { say "update through the screen FAILED"; tail -80 /tmp/up.log | tee -a $R; exit 1; }
+    grep -q "the first screen lists what is installed and the leftovers" /tmp/up.log && say "the first screen named what is installed and the leftovers" ;;
+  *) sh install.sh --yes > /tmp/up.log 2>&1 && say "update: ok" || { say "update FAILED"; tail -60 /tmp/up.log | tee -a $R; exit 1; } ;;
+esac
 hash -r 2>/dev/null; [ ! -e /usr/local/bin/material-grub ] && ! command -v material-grub >/dev/null 2>&1 && say "the old material-grub command is gone" || { say "the old command is still there"; ls -l /usr/local/bin | tee -a $R; exit 1; }
 [ ! -e /usr/share/material-grub-gui ] && [ ! -e /usr/libexec/material-grub-gui-helper ] && [ ! -e /usr/share/applications/material-grub-gui.desktop ] && say "the old editor is gone" || { say "the old editor is still there"; exit 1; }
 b=$(ls -d /var/backups/material-grub/upgrade-* 2>/dev/null | tail -n1)

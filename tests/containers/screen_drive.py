@@ -91,8 +91,6 @@ if curses_mode:
     send(ENTER)  # start typing
     send("7")
     send(ENTER)
-    wait("Graphical editor", 120)
-    send(ENTER)  # No
     wait("Ready to install", 120)
     send(ENTER)  # Install
 else:
@@ -108,7 +106,6 @@ else:
         ("Raw entry name line", ""),
         ("Countdown bar", "2"),  # No
         ("Timeout in seconds", "7"),
-        ("Graphical editor", ""),
     ):
         wait(title, 120)
         send(answer + "\n")
