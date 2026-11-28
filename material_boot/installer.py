@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
-from . import __version__, coreinstall, detect, migrate, plugins, state, tui
+from . import __version__, coreinstall, detect, migrate, plugins, progress, state, tui
 from . import conf as mgconf
 from . import overrides as mgoverrides
 from . import seeds as mgseeds
@@ -56,6 +56,8 @@ def parse_args(argv, parts=()):
         keep_build=False,
         help=False,
         tui=None,  # True: --tui (the screen even on an update), False: --no-tui
+        verbose=0,  # -v: the details of every part
+        quiet=False,  # -q: warnings, errors and the result
         root="",
         bundle=None,
         json=False,
@@ -102,6 +104,10 @@ def parse_args(argv, parts=()):
             o.yes = True
         elif flag in ("--tui", "--no-tui"):
             o.tui = flag == "--tui"
+        elif a in ("-v", "--verbose"):
+            o.verbose += 1
+        elif a in ("-q", "--quiet"):
+            o.quiet = True
         elif flag in FLAG_ATTR:
             setattr(o, FLAG_ATTR[flag], True)
         elif flag == "--style":
@@ -257,19 +263,68 @@ class Installer:
         self.how = how or ("package" if o.from_package else "immutable" if self.layout == "immutable" else "source")
         self.t0 = time.time()
         self.results = []  # (part name, "installed" | "failed" | "removed" | "unchanged", detail)
+        level = (
+            progress.LEVEL_QUIET
+            if getattr(o, "quiet", False)
+            else progress.LEVEL_VERBOSE
+            if getattr(o, "verbose", 0)
+            else progress.LEVEL_NORMAL
+        )
+        tty = bool(say is print and not o.json and sys.stdout.isatty())
+        self.log = self.open_log()
+        self.view = progress.View(
+            write=say,
+            verbosity=level,
+            tty=tty,
+            log=self.log,
+            utf8="utf" in (getattr(sys.stdout, "encoding", "") or "").lower(),
+        )
 
     # -- output
     def emit(self, event, **kw):
         if self.emit_:
             self.emit_(event, t=round(time.time() - self.t0, 1), **kw)
 
-    def say(self, text="", event="info"):
-        self.say_(text)
+    def event(self, part, ev):
+        """What a part reports while it works: drawn by the one view (text mode) and passed on in the --progress json stream."""
+        fields = ev if isinstance(ev, dict) else {"text": str(ev)}
+        if not self.o.json:
+            self.view.handle(ev)
+        self.emit(
+            fields.get("event", "info"),
+            part=part,
+            **{
+                k: v for k, v in fields.items() if k not in ("event", "t", "part")
+            },  # a part's program may have its own `t`
+        )
+
+    def say(self, text="", event="info", always=False):
+        if self.view.verbosity > progress.LEVEL_QUIET or event in ("warn", "error") or always:
+            self.say_(text)
+        if self.log:
+            try:
+                self.log.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {event:<7} {text}\n")
+            except (OSError, ValueError):
+                self.log = None
         self.emit(event, text=text)
 
     def step(self, text):
-        self.say_(f"\n== {text}")
+        self.view.heading(text)
         self.emit("step", text=text)
+
+    def open_log(self):
+        """The log of every event of a run, details included (/var/log/material-boot/install.log, under the root of a staged run); None when it cannot be written."""
+        o = self.o
+        if o.dry_run:
+            return None
+        path = Path(self.root or "/") / "var/log/material-boot/install.log"
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            f = open(path, "a", encoding="utf-8")
+            f.write(f"\n--- {time.strftime('%Y-%m-%d %H:%M:%S')} material-boot {__version__} ---\n")
+            return f
+        except OSError:
+            return None
 
     # -- paths
     def conf_path(self):
@@ -290,20 +345,7 @@ class Installer:
             root=self.root,
             dry_run=o.dry_run if dry is None else dry,
             yes=o.yes or o.json or o.from_package,
-            progress=lambda ev, n=part.name if part else None: self.emit(
-                ev.get("event", "info") if isinstance(ev, dict) else "info",
-                part=n,
-                **{
-                    k: v
-                    for k, v in (ev if isinstance(ev, dict) else {"text": str(ev)}).items()
-                    if k
-                    not in (
-                        "event",
-                        "t",
-                        "part",
-                    )  # the installer's own (time, which part): a part's program may have its own `t`
-                },
-            ),
+            progress=lambda ev, n=part.name if part else None: self.event(n, ev),
             options=(o.part_opts.get(part.name, {}) if part else {}),
             conf=mgconf.load_conf(str(self.conf_path())),
             backup_dir=getattr(self, "backup", None),
@@ -513,10 +555,12 @@ class Installer:
         self.say(
             "\n" + (". ".join(x.capitalize() for x in parts) + "." if parts else "Nothing to do."),
             "ok" if ok else "error",
+            always=True,  # the result of a run is shown with -q too
         )
         if not ok and "failed" in by:
             self.say(
-                "Parts that were installed stay installed; a failed part rolled itself back. Run again to retry the rest."
+                "Parts that were installed stay installed; a failed part rolled itself back. Run again to retry the rest.",
+                always=True,
             )
         if ok and by.get("installed") and not self.o.dry_run and not self.o.json and not self.o.uninstall:
             self.say("\nMore customisation, any time:")
@@ -524,6 +568,17 @@ class Installer:
                 self.say("  " + ln)
 
     def run(self):
+        try:
+            return self._run()
+        finally:
+            self.view.close()  # ends a step that is still running and stops the clock
+            if self.log:
+                try:
+                    self.log.close()
+                except OSError:
+                    pass
+
+    def _run(self):
         o = self.o
         self.emit("step", text="Checking the system")
         if not self.check_layouts():
@@ -562,7 +617,7 @@ def usage():
     return (
         "usage: material-boot core install [--with PART]... [--without PART]... [--only PART] [--yes] [--dry-run] [--force] [--from-package]\n"
         "           [--root DIR] [--bundle DIR] [--progress json] [--uninstall]\n"
-        "           [--tui | --no-tui] [--style S] [--scheme dark|light] [--seed #RRGGBB] [--seed-mode multi|single] [--[no-]cookie] [--[no-]logo] [--[no-]hints]\n"
+        "           [-v | -q] [--tui | --no-tui] [--style S] [--scheme dark|light] [--seed #RRGGBB] [--seed-mode multi|single] [--[no-]cookie] [--[no-]logo] [--[no-]hints]\n"
         "           [part options: --<part>-<name>, or --<name> when only one chosen part declares it]\n"
     )
 
