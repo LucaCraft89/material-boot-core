@@ -20,7 +20,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from . import CORE_API, __version__, plugins
+from . import CORE_API, __version__, help, plugins
 from . import conf as mgconf
 from . import overrides as mgoverrides
 from . import presets as mgpresets
@@ -296,27 +296,51 @@ def c_doctor(argv):
 
 
 COMMANDS = {
-    "conf": (c_conf, "show or change the shared settings (/etc/material-grub.conf)"),
-    "colour": (c_colour, "one seed colour for the whole look, or a colour per entry"),
-    "presets": (c_presets, "save, apply and delete looks: list | save | apply | delete | export | import"),
-    "overrides": (c_overrides, "colours, names and icons per entry: show | check | path | edit"),
-    "apply": (c_apply, "apply the look: the `apply` of every installed part"),
-    "doctor": (c_doctor, "the state of the core and of every part"),
-    "install": (c_install, "install, update or remove parts: --with, --without, --only, --dry-run, --uninstall"),
-    "parts": (c_parts, "which parts are installed, and why one cannot be used"),
+    name: (fn, help.CORE[name]["summary"])
+    for name, fn in (
+        ("conf", c_conf),
+        ("colour", c_colour),
+        ("presets", c_presets),
+        ("overrides", c_overrides),
+        ("apply", c_apply),
+        ("doctor", c_doctor),
+        ("install", c_install),
+        ("parts", c_parts),
+    )
 }
 ALIASES = {"color": "colour", "seed": "colour", "preset": "presets", "config": "conf", "status": "doctor"}
+
+
+def _bundle_arg(argv):
+    for i, a in enumerate(argv):
+        if a == "--bundle" and i + 1 < len(argv):
+            return argv[i + 1]
+        if a.startswith("--bundle="):
+            return a.split("=", 1)[1]
+    return os.environ.get("MATERIAL_BUNDLE")
 
 
 def dispatch(argv):
     """`material-boot core ...`"""
     if not argv or argv[0] in ("help", "-h", "--help"):
-        say(f"{PROG} core <command>:")
+        if argv[:1] == ["help"] and len(argv) > 1 and ALIASES.get(argv[1], argv[1]) in COMMANDS:
+            say(help.command_text(ALIASES.get(argv[1], argv[1])))
+            return 0
+        say(f"usage: {PROG} core <command> [--help]\n")
         for name, (_fn, text) in COMMANDS.items():
             say(f"  {name:<10}{text}")
+        say(f"\n{PROG} core <command> --help   the options and examples of one command")
         return 0
     name = ALIASES.get(argv[0], argv[0])
     if name not in COMMANDS:
         say(f"{PROG}: unknown core command '{argv[0]}' (try: {', '.join(COMMANDS)})")
         return 2
+    if help.wants_help(argv[1:]):  # before anything runs: `apply --help` must explain, not apply
+        if name == "install":
+            from . import installer
+
+            say(help.install_text(installer.available_parts(_bundle_arg(argv[1:]))))
+        else:
+            say(help.command_text(name))
+        return 0
     return COMMANDS[name][0](argv[1:]) or 0

@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
-from . import __version__, coreinstall, detect, migrate, plugins, progress, state, tui, uipart
+from . import __version__, coreinstall, detect, help, migrate, plugins, progress, state, tui, uipart
 from . import conf as mgconf
 from . import overrides as mgoverrides
 from . import seeds as mgseeds
@@ -689,13 +689,7 @@ def main(argv, say=print, ask=None):
     parts = available_parts(bundle)
     o, errors = parse_args(argv, parts)
     if o.help:
-        say(
-            usage()
-            + "\nparts: "
-            + (", ".join(p.name for p in parts) or "none")
-            + "\n"
-            + "".join(f"  --{p.name}-{x['name']:<16}{x['summary']}\n" for p in parts for x in p.options)
-        )
+        say(help.install_text(parts))
         return 0
     # installed = a manifest in a plugin directory, or a part the state record knows (a half-removed part still counts: it has to be repaired or removed)
     installed = {p.name for p in plugins.discover()} | set((state.read(o.root) or {}).get("parts") or {})

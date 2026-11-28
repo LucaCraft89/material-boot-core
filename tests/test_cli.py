@@ -87,7 +87,7 @@ class TopLevel(Base):
     def test_without_a_terminal_the_menu_is_the_help(self):
         rc, out, _ = self.call()
         self.assertEqual(rc, 0)
-        self.assertIn("Core commands:", out)
+        self.assertIn("Core commands", out)
 
     def test_unknown_command(self):
         rc, out, _ = self.call("frobnicate")

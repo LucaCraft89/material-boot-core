@@ -41,6 +41,7 @@ if [ $1 -eq 0 ]; then /usr/bin/material-boot core install --from-package --unins
 %{_datadir}/material-boot/assets
 %dir %{_datadir}/material-boot/plugins.d
 %{_libexecdir}/material-boot-ui-helper
+%{_mandir}/man1/material-boot.1*
 %{_datadir}/polkit-1/actions/org.material-boot.ui.policy
 %{_datadir}/applications/material-boot.desktop
 

@@ -1,0 +1,270 @@
+.TH MATERIAL\-BOOT 1 "" "material-boot 1.1.1" "Material Boot"
+.SH NAME
+material\-boot \- the look of your boot menu and boot splash, from one command
+.SH SYNOPSIS
+.B material\-boot
+[\fIcommand\fR] [\fIoptions\fR]
+.SH DESCRIPTION
+Material Boot themes the GRUB boot menu and the Plymouth boot splash with one look: a Material 3 palette, a style, per\-entry colours, names and icons. `material\-boot` alone opens a menu. The editor (`material\-boot ui`) changes everything in your browser with a live preview; the commands below do the same in a terminal.
+.SH COMMANDS
+.TP
+\fBmaterial\-boot ui\fR
+the editor in your browser: every setting of every part, with a live preview
+.TP
+\fBmaterial\-boot help\fR [\fItopic\fR]
+Everything, or one command (\fBhelp core install\fR, \fBhelp ui\fR, \fBhelp grub\fR).
+.TP
+\fBmaterial\-boot version\fR
+The version of the core and of every installed part.
+.TP
+\fBmaterial\-boot core conf [KEY=VALUE ...]\fR
+show or change the shared settings (/etc/material\-grub.conf)
+.TP
+\fBmaterial\-boot core colour [#RRGGBB | NAME | multi] [\-\-apply]\fR
+one seed colour for the whole look, or a colour per entry
+.TP
+\fBmaterial\-boot core presets [list | save NAME | apply NAME [\-\-apply] | delete NAME | export NAME FILE | import FILE]\fR
+save a look under a name, bring it back, move it to another machine
+.TP
+\fBmaterial\-boot core overrides [show | check | path | edit]\fR
+colours, names and icons per entry, their order and which are hidden
+.TP
+\fBmaterial\-boot core apply [\-\-only PART] [ARGS for the parts]\fR
+draw the look again: the `apply` of every installed part
+.TP
+\fBmaterial\-boot core doctor\fR
+the state of the core and of every part
+.TP
+\fBmaterial\-boot core parts\fR
+which parts are installed, and why one cannot be used
+.TP
+\fBmaterial\-boot core install [OPTIONS]\fR
+install, update or remove parts
+.TP
+\fBmaterial\-boot\fR \fIpart\fR \fIcommand\fR
+A command of an installed part (grub, plymouth). \fBmaterial\-boot help\fR \fIpart\fR lists them.
+.SH CONF
+.B material\-boot core conf [KEY=VALUE ...]
+.PP
+Without arguments it prints every setting and its value. KEY=VALUE changes it (a value that is not allowed is refused and nothing is written). The settings are shared by every part; the keys are STYLE, SCHEME, COOKIE, LOGO, HINTS, RAW_NAME, COUNTDOWN, TIMEOUT, MODE and the PLYMOUTH_* ones. Run `apply` afterwards to draw the new look.
+.SS Examples
+.TP
+\fBmaterial\-boot core conf\fR
+show the settings
+.TP
+\fBsudo material\-boot core conf STYLE=list HINTS=off\fR
+two changes at once
+.SH COLOUR
+.B material\-boot core colour [#RRGGBB | NAME | multi] [\-\-apply]
+.PP
+Without arguments it shows the current choice. A colour (#RRGGBB, or one of the preset names such as forest or tangerine) makes every entry use the Material 3 palette of that one seed; `multi` goes back to a colour per entry. The colour is saved in the overrides file.
+.SS Options
+.TP
+\fB\-\-apply\fR
+apply the look right after saving the colour
+.SS Examples
+.TP
+\fBmaterial\-boot core colour\fR
+show the current choice
+.TP
+\fBsudo material\-boot core colour '#7E57C2' \-\-apply\fR
+lavender everywhere, applied now
+.TP
+\fBsudo material\-boot core colour multi\fR
+a colour per entry again
+.SH PRESETS
+.B material\-boot core presets [list | save NAME | apply NAME [\-\-apply] | delete NAME | export NAME FILE | import FILE]
+.PP
+A preset is the shared settings and the overrides (colours, names, icons, order) under one name. `list` is the default. `export` writes a single file you can copy to another machine and `import` reads it.
+.SS Options
+.TP
+\fB\-\-apply\fR
+with `apply NAME`: apply the look right after loading the preset
+.SS Examples
+.TP
+\fBmaterial\-boot core presets\fR
+list the presets
+.TP
+\fBsudo material\-boot core presets save work\fR
+keep the current look as "work"
+.TP
+\fBsudo material\-boot core presets apply work \-\-apply\fR
+bring it back and apply it
+.SH OVERRIDES
+.B material\-boot core overrides [show | check | path | edit]
+.PP
+The overrides file (/etc/material\-grub/overrides.json) holds what you changed about single menu entries. `show` prints it, `check` validates it (a broken file is ignored at boot, never fatal), `path` prints where it is and `edit` opens it in $EDITOR and validates before saving. The editor (`material\-boot ui`) does the same with pictures.
+.SS Examples
+.TP
+\fBmaterial\-boot core overrides check\fR
+is the file valid?
+.TP
+\fBsudo material\-boot core overrides edit\fR
+edit it in $EDITOR
+.SH APPLY
+.B material\-boot core apply [\-\-only PART] [ARGS for the parts]
+.PP
+Rebuilds the shared data when the colour scheme changed, then runs the `apply` command of every installed part that has one, in name order (GRUB: grub.cfg and the scenes; Plymouth: the splash and the initramfs). One part failing does not stop the others, and the exit status says so. Anything else on the line is passed on to each part's own apply.
+.SS Options
+.TP
+\fB\-\-only\fR \fIPART\fR
+apply only this part (`core` rebuilds only the shared data)
+.SS Examples
+.TP
+\fBsudo material\-boot core apply\fR
+everything
+.TP
+\fBsudo material\-boot core apply \-\-only grub\fR
+only the boot menu
+.SH DOCTOR
+.B material\-boot core doctor
+.PP
+Checks the core, then each installed part runs its own checks. Nothing is changed. Paste the output into a bug report. The exit status is 1 when something failed.
+.SS Examples
+.TP
+\fBmaterial\-boot core doctor\fR
+the report
+.SH PARTS
+.B material\-boot core parts
+.PP
+One line per part with its version and whether it is usable; a part that is not usable says why (an incompatible version, a broken manifest).
+.SS Examples
+.TP
+\fBmaterial\-boot core parts\fR
+the list
+.SH INSTALL
+.B material\-boot core install [OPTIONS]
+.PP
+Installs, updates or removes the parts of Material Boot (the core, grub,
+plymouth, ui).
+.SS Which parts
+.TP
+\fB\-\-with\fR \fIPART[,PART]\fR
+install these parts too (on a new machine: only these; `ui` is on by default on a desktop)
+.TP
+\fB\-\-without\fR \fIPART[,PART]\fR
+leave these parts out (`\-\-without ui` skips the editor's launcher)
+.TP
+\fB\-\-only\fR \fIPART\fR
+do only this part (the core is added when it is missing; no other part is touched)
+.SS The look (shared by every part; asked on the screen, or given here)
+.TP
+\fB\-\-style\fR \fISTYLE\fR
+the menu layout: rail, clean, list or split
+.TP
+\fB\-\-scheme\fR \fIdark|light\fR
+dark or light colours
+.TP
+\fB\-\-seed\fR \fI#RRGGBB\fR
+one seed colour for everything (implies \-\-seed\-mode single)
+.TP
+\fB\-\-seed\-mode\fR \fImulti|single\fR
+multi: a colour per entry; single: one seed colour for all
+.TP
+\fB\-\-cookie\fR, \fB\-\-no\-cookie\fR
+the round cookie (logo badge) on the menu
+.TP
+\fB\-\-logo\fR, \fB\-\-no\-logo\fR
+the distribution's logo on it
+.TP
+\fB\-\-hints\fR, \fB\-\-no\-hints\fR
+the key hints at the bottom
+.SS How it runs
+.TP
+\fB\-\-yes\fR, \fB\-y\fR
+do not ask: take the defaults and what is given here (also what scripts and packages use)
+.TP
+\fB\-\-tui\fR, \fB\-\-no\-tui\fR
+show the question screen even on a machine that is set up already / never show it
+.TP
+\fB\-\-dry\-run\fR
+say what would be done and change nothing
+.TP
+\fB\-\-force\fR
+install again even when up to date or when a newer version is installed
+.TP
+\fB\-\-uninstall\fR
+remove the chosen parts (the settings in /etc stay); the core goes only with `\-\-only core`
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+show the details of every step (the log in /var/log/material\-boot has them anyway)
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+only warnings, errors and the result
+.TP
+\fB\-\-progress\fR \fIjson\fR
+one JSON event per line on stdout (what the editor reads)
+.SS Where from, where to
+.TP
+\fB\-\-bundle\fR \fIDIR\fR
+the unpacked bundle to install from (default: the one this was started from)
+.TP
+\fB\-\-root\fR \fIDIR\fR
+work on a system staged under DIR (tests, image builds); nothing outside it is touched
+.TP
+\fB\-\-from\-package\fR
+what a package's post\-install step passes: the files are in place, only the machine\-specific part is done
+.TP
+\fB\-\-keep\-build\fR
+keep the temporary build directory (to debug a failed build)
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+this text
+.SS Examples
+.TP
+\fBsudo ./install.sh\fR
+the first install (opens the question screen on a terminal)
+.TP
+\fBsudo material\-boot core install \-\-dry\-run\fR
+see what an update would do, change nothing
+.TP
+\fBsudo material\-boot core install \-\-yes \-\-style list \-\-scheme light\fR
+no questions: GRUB with the list style, light colours
+.TP
+\fBsudo material\-boot core install \-\-with plymouth\fR
+add the boot splash
+.TP
+\fBsudo material\-boot core install \-\-without ui\fR
+install without the editor's launcher
+.TP
+\fBsudo material\-boot core install \-\-uninstall \-\-only plymouth\fR
+remove only the boot splash
+.TP
+\fBsudo material\-boot core install \-\-tui\fR
+the question screen again, on a machine that is set up already
+.SH UI
+.B material\-boot ui [\-\-port N] [\-\-no\-browser] [\-\-idle SECONDS]
+.PP
+Opens the Material Boot editor in your default browser: the boot menu and the boot splash, in one place, with a live preview. It listens on this computer only (127.0.0.1) with a one\-time key in the address, and stops by itself when the tab is closed. Saving asks for your password once (polkit); nothing is changed before that. The pages are the installed parts': Style, Entries and Ventoy exist with GRUB, Boot splash with Plymouth.
+.SS Options
+.TP
+\fB\-\-port\fR \fIN\fR
+listen on port N (default: any free port)
+.TP
+\fB\-\-no\-browser\fR
+only print the address
+.TP
+\fB\-\-idle\fR \fISECONDS\fR
+stop after this long without a browser (default 120; 0 = never)
+.SS Examples
+.TP
+\fBmaterial\-boot ui\fR
+open the editor
+.TP
+\fBmaterial\-boot ui \-\-no\-browser \-\-port 8765\fR
+only print the address, on a fixed port
+.SH FILES
+.TP
+\fI/etc/material\-grub.conf\fR
+The shared settings (style, scheme, ...).
+.TP
+\fI/etc/material\-grub/overrides.json\fR
+Colours, names, icons and order per entry; the pictures are in \fIicons/\fR next to it.
+.TP
+\fI/var/log/material\-boot/install.log\fR
+What every install did, with the details.
+.TP
+\fI/var/backups/material\-grub/\fR
+Backups made before anything is changed.
+.SH SEE ALSO
+https://github.com/LucaCraft89/material\-boot\-core

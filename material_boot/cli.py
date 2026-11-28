@@ -85,12 +85,37 @@ def c_version(argv):
 
 
 def c_help(argv):
-    from . import commands
+    """`material-boot help` (everything), `help core install`, `help ui`, `help grub` (a part's own commands)."""
+    from . import commands, help
 
+    if argv:
+        topic = argv[1:] if argv[0] == "core" else argv
+        if argv[0] == "core" and topic:
+            name = commands.ALIASES.get(topic[0], topic[0])
+            if name in commands.COMMANDS:
+                if name == "install":
+                    from . import installer
+
+                    say(help.install_text(installer.available_parts(None)))
+                else:
+                    say(help.command_text(name))
+                return 0
+        elif argv[0] == "ui":
+            say(help.command_text("ui"))
+            return 0
+        elif plugins.find(argv[0]):
+            p = plugins.find(argv[0])
+            say(f"{PROG} {p.name}: {p.title}" + (f"\n\n{p.summary}" if p.summary else "") + "\n")
+            for c, text in p.commands.items():
+                say(f"  {PROG} {p.name} {c:<12}{text}")
+            say(f"\n{PROG} {p.name} <command> --help   the options of one command")
+            return 0
+        say(f"{PROG}: no help for '{' '.join(argv)}' (try: {PROG} help)")
+        return 2
     say("\n".join((__doc__ or "").strip("\n").split("\n")[1:]).split("Only help, version")[0].strip("\n"))
-    say("\nCore commands:")
+    say("\nCore commands (each has --help with its options and examples):")
     for name, (_fn, text) in commands.COMMANDS.items():
-        say(f"  {PROG} core {name:<10}{text}")
+        say(f"  {PROG} core {name:<11}{text}")
     found = plugins.discover()
     if found:
         say("\nParts installed:")
@@ -102,6 +127,7 @@ def c_help(argv):
             )
             for c, text in p.commands.items():
                 say(f"      {c:<12}{text}")
+    say(f"\nMore: {PROG} help core install | {PROG} help ui | {PROG} help <part>   (and `man material-boot`)")
     return 0
 
 

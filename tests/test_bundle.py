@@ -309,7 +309,7 @@ class Installer(Base):
     def test_help_lists_the_parts(self):
         r = self.sh("--help")
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("parts: core, grub, plymouth", r.stdout)
+        self.assertIn("Parts: core, grub, plymouth", r.stdout)
 
     def test_a_changed_file_stops_the_install(self):
         (self.stage / "LICENSE").write_text("tampered\n")
