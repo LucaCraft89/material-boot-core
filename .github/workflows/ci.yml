@@ -34,6 +34,7 @@ jobs:
         with: {python-version: "${{ matrix.python }}"}
       - run: pip install pillow    # the renderer needs it; the pure modules are tested without it in a subprocess (tests/test_skeleton.py)
       - run: python -m unittest discover -s tests -v
+      - run: python scripts/gen_ui_tokens.py && git diff --exit-code material_boot/ui/web/tokens.css      # the editor's colours are generated, never edited by hand
 
   snapshot:
     # The render snapshot (tests/snapshot): material-grub's own scenes, rendered by the real commands, must hash exactly as tests/snapshot/golden.json says.
