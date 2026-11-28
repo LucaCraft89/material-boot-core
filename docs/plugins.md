@@ -1,6 +1,6 @@
 # Parts and the plugin API (API 2)
 
-Material Boot is a core plus **parts**: material-grub, material-plymouth, the GUI, and whatever comes next (another bootloader, a login screen). A part lives in its own package and repository. The core finds it through **one manifest file**, runs its commands as `material-boot <part> ...`, and hands its steps to the unified installer. A part that is not installed has no manifest, so it has no module, no menu entry, no line in `help` or `doctor`.
+Material Boot is a core plus **parts**: material-grub, material-plymouth, and whatever comes next (another bootloader, a login screen). A part lives in its own package and repository. The core finds it through **one manifest file**, runs its commands as `material-boot <part> ...`, and hands its steps to the unified installer. A part that is not installed has no manifest, so it has no module, no menu entry, no line in `help` or `doctor`.
 
 The code is `material_boot/plugins.py` (tested by `tests/test_plugins.py`). This page is what a part author needs to know.
 
@@ -46,7 +46,7 @@ Problems never take the core down: a broken, incompatible or unsatisfied part is
 
 ### Dependencies
 
-`install.needs` names other parts. A part whose need is missing or unusable is itself unusable, and the chain is followed (`gui` needs `grub`, which is broken, so `gui` is reported as "needs the grub part, which cannot be used"). **material-plymouth needs nothing but the core**: it installs and runs without material-grub. The GUI needs `grub`.
+`install.needs` names other parts. A part whose need is missing or unusable is itself unusable, and the chain is followed (a part that needs `grub`, which is broken, is reported as "needs the grub part, which cannot be used"). **material-plymouth needs nothing but the core**: it installs and runs without material-grub. The GUI needs `grub`.
 
 ### `install.questions`: what the installer screen asks
 
@@ -58,7 +58,6 @@ and the part needs no code for it:
   {"id": "res", "title": "Resolution", "kind": "choice", "help": "The size of your screen.",
    "options": [{"value": "", "label": "Detected automatically"}, {"value": "1920x1080", "label": "1920x1080", "help": "..."}],
    "allow_text": true, "pattern": "[0-9]{3,5}x[0-9]{3,5}", "target": {"option": "res"}, "when": "fresh"},
-  {"id": "gui", "title": "Graphical editor", "kind": "toggle", "default": false, "target": {"option": "with-gui"}},
   {"id": "countdown", "title": "Countdown bar", "kind": "toggle", "default": true, "target": {"conf": "COUNTDOWN"}}
 ]
 ```
@@ -114,7 +113,7 @@ Called by the unified installer, `doctor` and the upgrade machinery, each as `ho
 
 ## Commands
 
-`material-boot <part> [command]`. The core is itself a module: `material-boot core <command>` carries the settings and tools that belong to the whole system. Today: `conf`, `colour`, `overrides`, `apply`, `doctor` and `parts`; `presets`, `update`, `uninstall` and `gui` follow with the code they need. Only `help`, `version` and the menu are top-level; a core command typed at the top level gets a "did you mean `material-boot core ...`" hint.
+`material-boot <part> [command]`. The core is itself a module: `material-boot core <command>` carries the settings and tools that belong to the whole system. Today: `conf`, `colour`, `overrides`, `apply`, `doctor` and `parts`; `presets` and `install` too; the editor is the top-level `material-boot ui`. Only `help`, `version` and the menu are top-level; a core command typed at the top level gets a "did you mean `material-boot core ...`" hint.
 
 - **`core apply`** runs the `apply` command of every usable part whose manifest lists one (`commands`), in name order; one failing does not stop the others, and the exit status says so. `--only PART` runs one.
 - **`core doctor`** prints the core, every part (and why one cannot be used), then each part's `hook_doctor(ctx)` lines `[(level, text)]`; a level of `fail` or `error`, a part that cannot be used, or a hook that crashes makes the exit status 1.
@@ -128,3 +127,7 @@ Put a manifest and an entry file in a temporary directory, set `MATERIAL_PLUGIN_
 
 A part's repository keeps its manifest at its root as `material-boot-part.json` (the same file as the one the package installs into `plugins.d`, with `entry` relative to the repository). The bundle builder takes the part's committed files into `parts/<name>/`, checks that the manifest is usable, and copies it to `parts/<name>/manifest.json`, which is where the installer looks for parts that are not installed yet. See [installer.md](installer.md).
 
+
+## Parts and the editor
+
+The editor ([editor.md](editor.md)) shows a page for a part when that part is installed and usable: **Style, Entries and Ventoy** for `grub`, **Boot splash** for `plymouth`. Today those pages are the editor's own (a part cannot add pages of its own yet: that needs a stable page API, and a second part to design it against). What a part does give the editor is what it already declares: its `conf` keys, its `doctor` rows (the Overview's health checks) and its `apply` command (what the helper runs). The GRUB-only preview and Ventoy code are read from the GRUB part's own modules, found through its manifest, and the pages say so when GRUB is not installed.

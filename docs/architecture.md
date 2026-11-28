@@ -9,14 +9,14 @@ material-boot <module> [command]      module = core | grub | plymouth | (any fut
 material-boot help | version          the only top-level words (they must work with nothing installed), plus the menu when run alone
 ```
 
-- `material-boot core colour|presets|overrides|conf|doctor|update|uninstall|gui|apply ...`: the settings and tools that belong to the whole system. `core` is itself a registered module, so the dispatcher has no special case.
+- `material-boot ui`: the editor (part of the core, see [editor.md](editor.md)).
+- `material-boot core conf|colour|presets|overrides|apply|doctor|parts|install ...`: the settings and tools that belong to the whole system. `core` is itself a registered module, so the dispatcher has no special case.
 - `material-boot grub apply|preview|ventoy|...`: GRUB only.
 - `material-boot plymouth apply|status|remove|preview|...`: Plymouth only.
 - A part that is not installed has no module, no menu entry and no line in `help`.
 - **How it runs:** `bin/material-boot` (a POSIX shell shim; the packages install it as `/usr/bin/material-boot`) puts the library on `PYTHONPATH` (`$MATERIAL_LIB`, else `/usr/share/material-boot/lib`, else the checkout) and runs `python -m material_boot`; `/var/lib/material-grub/env` may name another Python (`MATERIAL_PY`) for systems whose `python3` is too old. The code is `material_boot/cli.py` (the dispatcher and the helpers a part receives), `commands.py` (the `core` module) and `menu.py`.
 - **`core` today:** `conf`, `colour`, `overrides` (the shared-settings commands of `material-grub`, bodies unchanged), `apply` (the `apply` of every installed part, one failing does not stop the others), `doctor` (the core, every part, and each part's `hook_doctor`) and `parts`. `presets` (needs `mgpresets`), `update`, `uninstall` and `gui` come with the code they depend on.
-- **The alias is not a mapping, it is the old front end.** `material-grub X` keeps working because material-grub keeps its existing `cmd_cli.py` as the legacy front end (same commands, same messages, same exit codes), rebuilt on the core's modules in G1 and given the core's plugin registry for `material-grub plymouth ...` in G2. That is the only way to guarantee "exactly as today" for the hooks, the path unit and the polkit helper. `material-boot` is the new front door; the two share the code, not the command table.
-- `material-grub` stays as an alias of the old behaviour: `material-grub X` does what it does today, `plymouth` included, and `material-grub apply` stays GRUB-only (a hook must never rebuild an initramfs by surprise). The deprecation note shows only in `help`, `version`, `doctor` and the menu, never in hook or journal output. Hooks, units and the polkit helper keep calling the alias in 1.0.0.
+- **The old command is gone (1.2.0).** `material-grub` was the front end of material-grub 0.7 to 1.1; its words moved: `apply`, `doctor`, `preview`, `ventoy`, `uninstall` are `material-boot grub ...`, `colour`, `conf`, `presets`, `overrides` are `material-boot core ...`, `gui` is `material-boot ui`, `update` and `version` are `material-boot core install` and `material-boot version`. The old word prints where it went. The kernel hooks (deb, pacman), the editor's helper and Plymouth's grub.cfg rebuild all call `material-boot grub apply`; the installer removes the old command and the old editor, backing them up first.
 
 ## What lives here
 
@@ -33,9 +33,9 @@ Stays in the parts: GRUB scene layouts, resolutions, BLS handling, the `grub.d` 
 | Package | Owns | Requires |
 |---|---|---|
 | `material-boot-core` | `/usr/share/material-boot/{lib/material_boot,data,plugins.d}`, the `material-boot` shim | python |
-| `material-grub` | `/usr/share/material-grub` (as today, minus what moved), the `material-grub` alias | core, same major |
+| `material-grub` | `/usr/share/material-grub` (as today, minus what moved), the kernel hooks | core >= 1.2.0 |
 | `material-plymouth` | `/usr/share/material-plymouth` | core, same major (no longer material-grub) |
-| `material-grub-gui` | as today | core |
+| ~~`material-grub-gui`~~ | removed in 1.2.0: the editor is `material-boot ui`, in the core package (which obsoletes it) | |
 | `material-boot` (meta) | nothing | core and grub; **not** Plymouth, which rebuilds the initramfs and is always an explicit choice |
 
 - **Python 3.9 is the floor** (the same as material-grub's packages). The vendored colour science does not import on 3.8, which CI found; material-grub's installer still says "3.8+" for the installed tools, which is therefore wrong and is tracked for G1.

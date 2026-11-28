@@ -23,7 +23,6 @@ material-boot-<version>/
   lib/material_boot/  bin/material-boot  data/               the core
   parts/grub/       manifest.json + the part's sources        (material-grub)
   parts/plymouth/   manifest.json + the part's sources        (material-plymouth)
-  parts/gui/        ...
 ```
 
 A part that is not installed yet has no manifest in `plugins.d`, so the installer also reads the manifests in `parts/*/manifest.json` of the bundle. In a manifest, `entry` may be **relative to the manifest's directory** (an installed manifest uses an absolute path, a bundle one cannot know it): `plugins.read_manifest` resolves both.
@@ -40,6 +39,17 @@ A part that is not installed yet has no manifest in `plugins.d`, so the installe
 
 `--uninstall` runs `hook_uninstall` in reverse dependency order. The core itself is installed first and removed last; `--without core` does not exist.
 
+## 1.2.0: what a run does now (the user-facing flow)
+
+The design is [plans/ux.md](plans/ux.md); this is what is implemented.
+
+- **One progress view** (`progress.py`). Every part reports *events* (a step starts, a detail, a warning); the installer is the only thing that draws them: one heading per part, one line per step with its time, and **a live clock on a step that takes more than two seconds** (`Rebuilding the initramfs ... 41 s`), so nothing looks stuck. On a pipe or in a log it is two plain lines per step. `-v` adds the details, `-q` shows only warnings, errors and the result; **everything, details included, is kept in `/var/log/material-boot/install.log`** whatever the verbosity.
+- **Only what changes is touched.** A part that is installed at this version is skipped (`already installed at this version`), and the shared look is written only when a value differs from what is set. `--force` installs anyway.
+- **The screen** on a terminal: the parts, the shared look (with a preview), each part's `install.questions`. On a machine that is set up already it first asks **keep the current look and settings, or edit them now?** (default: keep) and shows what is installed. After the install everything further is in the editor ([editor.md](editor.md)).
+- **Leftovers of 1.1 and older** (`migrate.OldInstall`): the `material-grub` command (and its older names) and the old graphical editor are listed on the first screen and in the plan (`--dry-run`), **backed up** under `/var/backups/material-grub/upgrade-<from>-to-<to>-<time>/`, then removed. A file a package owns is only named (remove that package with your package manager; the core package replaces `material-grub-gui`).
+- **The `ui` part** (`uipart.py`): the launcher, the helper and the polkit policy of the editor. It is **on by default only on a machine with a graphical session** (an environment session, a graphical default target, or installed session files) and a normal layout; `--without ui` leaves it out, `--with ui` forces it. A package ships the same three files, so for a package install the part only checks them.
+- **Help from one table** (`help.py`): `--help` of every command, `material-boot help <topic>`, the installer's help and the man page are all made from it, and `tests/test_help.py` checks that every option the installer accepts is documented, every documented option is accepted, every example runs, and `--help` never runs the command.
+
 ## Events
 
 The `--progress json` stream keeps the names the GUI already parses: `step`, `info`, `ok`, `warn`, `error`, `progress`, `log`, `done`, `existing_install`. New fields are added, none are renamed, and a part reports through `ctx.progress(event)`, which the installer tags with the part's name. The log (`open_log`, `LineEvents`, `Tee`) moves as it is.
@@ -55,7 +65,7 @@ The `--progress json` stream keeps the names the GUI already parses: `step`, `in
 
 **Decision (cross-part rollback): none.** Each part's `hook_install` is already atomic for that part (GRUB's guarded rewrite, Plymouth's backup-and-restore, the migration runner); the installer stops at the first part that fails, leaves the parts that succeeded installed and recorded, and says exactly that:
 
-> Installed: grub. Failed: plymouth (rolled back, nothing of it changed). Not run: gui. Run again to retry the rest.
+> Installed: grub. Failed: plymouth (rolled back, nothing of it changed). Not run: ui. Run again to retry the rest.
 
 All-or-nothing across parts would mean uninstalling a working GRUB theme because the splash failed, which is worse for the user than a clear half result, and it needs every part to undo a *completed* install (a different, riskier operation than undoing a failed one). A part whose `hook_install` raises or returns a failure is rolled back by that part; a part that crashes **outside** its guard is the part's bug and is reported as such. Interrupted runs (power loss) follow the rule of the plan: the backup and "old keeps working until the swap" leave the old or the new complete state, `doctor` detects a half state, the next run repairs it.
 
