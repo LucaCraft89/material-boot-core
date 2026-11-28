@@ -385,6 +385,7 @@ class Installer:
     def existing(self):
         """Print one notice for everything that is already there, apply the policy, ask. Returns True to go on."""
         found = self.detect_all()
+        self.found = found  # install() leaves a part alone when it is up to date
         if all(f.kind == "none" for f in found.values()):
             return True
         self.step("Existing install")
@@ -416,28 +417,50 @@ class Installer:
         self.say("nothing changed")
         return False
 
+    look_changed = False
+
     def write_look(self):
-        """The shared look, once, before any part runs: the conf keys and the seed colour."""
+        """The shared look, once, before any part runs: the conf keys and the seed colour. Only what differs from what is set now is shown and written, and
+        `look_changed` tells install() whether the parts have anything to re-render."""
         o = self.o
         if not (o.look or o.seed_mode):
             return True
+        now = mgconf.load_conf(str(self.conf_path()))
+        changed_keys = {k: v for k, v in o.look.items() if now.get(k) != v}
+        ov, _ = mgoverrides.load(self.overrides_path())
+        seed_now = ov.get("seed") or {}
+        new_color = o.seed or seed_now.get("color")
+        seed_changed = bool(
+            o.seed_mode
+            and (
+                seed_now.get("mode") != o.seed_mode
+                or (o.seed_mode == "single" and str(seed_now.get("color", "")).upper() != str(new_color).upper())
+            )
+        )
+        self.look_changed = bool(changed_keys or seed_changed)
+        if not self.look_changed:
+            return True  # nothing differs from what is set: nothing is written, and nothing needs re-rendering
         self.step("The look (shared by every part)")
-        for k, v in o.look.items():
-            self.say(f"  {k}={v}")
-        if o.seed_mode:
+        for k, v in changed_keys.items():
+            self.say(f"  {k}={v}" + (f"  (was {now.get(k)})" if now.get(k) not in (None, "") else ""))
+        if seed_changed:
             self.say(
-                f"  colours: {'one seed colour ' + o.seed if o.seed_mode == 'single' and o.seed else 'every entry its own colour' if o.seed_mode == 'multi' else 'one seed colour'}"
+                f"  colours: {'one seed colour ' + str(new_color) if o.seed_mode == 'single' else 'every entry its own colour'}"
+                + (
+                    f"  (was {'one seed colour ' + str(seed_now.get('color')) if seed_now.get('mode') == 'single' else 'every entry its own colour'})"
+                    if seed_now.get("mode")
+                    else ""
+                )
             )
         if o.dry_run:
             return True
         try:
-            if o.look:
+            if changed_keys:
                 self.conf_path().parent.mkdir(parents=True, exist_ok=True)
-                mgconf.write_conf(self.conf_path(), o.look)
-            if o.seed_mode:
+                mgconf.write_conf(self.conf_path(), changed_keys)
+            if seed_changed:
                 p = self.overrides_path()
-                ov, _ = mgoverrides.load(p)
-                ov["seed"] = {"mode": o.seed_mode, "color": o.seed or ov["seed"]["color"]}
+                ov["seed"] = {"mode": o.seed_mode, "color": new_color or ov["seed"]["color"]}
                 mgoverrides.save(ov, p)
         except (OSError, ValueError) as e:
             self.say(f"cannot write the look: {e}", "error")
@@ -485,6 +508,11 @@ class Installer:
     def install(self):
         for idx, p in enumerate(self.parts):
             self.step(f"{p.title} {p.version}")
+            if self.up_to_date(p):
+                self.say("  already installed at this version: nothing to do (--force installs it again)")
+                self.results.append((p.name, "unchanged", "up to date"))
+                self.emit("ok", text=f"{p.title} {p.version} is up to date", part=p.name)
+                continue
             r = plugins.call_hook(p, "install", self.ctx(p)) if "install" in p.hooks else None
             if r is None:
                 self.say(f"{p.name} has no install step: nothing to do")
@@ -514,6 +542,22 @@ class Installer:
             self.results.append((p.name, "installed" if value.get("changed", True) else "unchanged", ""))
             self.emit("ok", text=f"{p.title} {p.version} installed", part=p.name)
         return True
+
+    def up_to_date(self, p):
+        """True when installing `p` would change nothing: it is installed at this very version, nothing of it is missing, and neither the look nor an option of
+        its own asks for another render. (A package run, `--force` and a part that is not installed are never skipped.)"""
+        f = getattr(self, "found", {}).get(p.name)
+        o = self.o
+        return bool(
+            f
+            and f.kind == "same"
+            and not f.missing
+            and not o.force
+            and not self.look_changed
+            and not o.part_opts.get(p.name)
+            and self.how == "source"
+            and not f.how.startswith("package")
+        )
 
     def uninstall(self):
         ok = True
@@ -652,7 +696,17 @@ def main(argv, say=print, ask=None):
         p.name for p in parts
     }  # a name in the state record that no part provides is not installable (see select)
     if not errors and tui.wanted(o):
-        if not tui.run(parts, installed, o, say=say, inp=ask or input, record=(state.read(o.root) or {}).get("parts")):
+        cur_conf = mgconf.load_conf(str(Path(o.root) / "etc/material-grub.conf") if o.root else None)
+        cur_ov, _ = mgoverrides.load(Path(o.root) / "etc/material-grub/overrides.json" if o.root else None)
+        if not tui.run(
+            parts,
+            installed,
+            o,
+            say=say,
+            inp=ask or input,
+            record=(state.read(o.root) or {}).get("parts"),
+            current={"conf": cur_conf, "seed": (cur_ov or {}).get("seed")},
+        ):
             return 1
     chosen, notes, serr = select(parts, installed, o)
     errors += serr

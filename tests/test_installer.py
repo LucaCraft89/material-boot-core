@@ -178,7 +178,9 @@ class UnknownInstalledPart(Base):
         state.record(
             str(self.rootdir), "1.0.0", "source", "normal", parts={"core": "1.0.0", "grub": "1.0.0", "gui": "0.7.1"}
         )
-        rc, out = self.run_cli("--yes")
+        rc, out = self.run_cli(
+            "--yes", "--force"
+        )  # the record says 1.0.0, the part is 1.0.0: it would be left alone without --force
         self.assertEqual(rc, 0, out)
         self.assertNotIn("Traceback", out)
         self.assertEqual(self.hooks_of("install"), ["grub"])
@@ -189,6 +191,74 @@ class UnknownInstalledPart(Base):
         o, errors = installer.parse_args([], parts)
         chosen, _notes, errs = installer.select(parts, {"grub", "gui"}, o)
         self.assertEqual((errs, [p.name for p in chosen]), ([], ["grub"]))
+
+
+class UpToDate(Base):
+    """An install changes only what changes: a part at this very version is left alone (adding Plymouth to a machine that has GRUB re-rendered the whole
+    GRUB theme, about fifty seconds, for nothing)."""
+
+    def setUp(self):
+        super().setUp()
+        self.part("grub", install={"default": True}, detect={"found": True, "version": "1.0.0", "how": "source"})
+        self.part("plymouth", install={"options": [{"name": "no-cmdline", "takes": "flag"}]})
+        state.record(
+            str(self.rootdir), "1.0.0", "source", "normal", parts={"core": material_boot.__version__, "grub": "1.0.0"}
+        )
+
+    def test_adding_a_part_leaves_what_is_up_to_date_alone(self):
+        rc, out = self.run_cli("--yes", "--with", "plymouth")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(self.hooks_of("install", core=True), ["plymouth"])  # not the core, not GRUB
+        self.assertIn("nothing to do", out)
+        self.assertIn("Unchanged: core, grub", out)
+        self.assertIn("Installed: plymouth", out)
+
+    def test_force_installs_it_again(self):
+        self.run_cli("--yes", "--with", "plymouth", "--force")
+        self.assertEqual(self.hooks_of("install", core=True), ["core", "grub", "plymouth"])
+
+    def test_a_changed_look_means_the_parts_render_again(self):
+        rc, out = self.run_cli("--yes", "--with", "plymouth", "--style", "list")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(self.hooks_of("install", core=True), ["core", "grub", "plymouth"])
+        self.assertIn("STYLE=list", out)
+
+    def test_the_look_asked_again_with_the_same_answers_changes_nothing(self):
+        (self.rootdir / "etc/material-grub.conf").write_text("STYLE=list\n")
+        rc, out = self.run_cli("--yes", "--with", "plymouth", "--style", "list")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(self.hooks_of("install", core=True), ["plymouth"])
+        self.assertNotIn("The look", out)
+
+    def test_an_option_of_a_part_means_that_part_runs_again(self):
+        self.part(
+            "grub",
+            install={"default": True, "options": [{"name": "res", "takes": "value"}]},
+            detect={"found": True, "version": "1.0.0", "how": "source"},
+        )
+        self.run_cli("--yes", "--grub-res", "1920x1080")
+        self.assertEqual(self.hooks_of("install", core=True), ["grub"])
+
+    def test_an_older_install_is_updated(self):
+        state.record(
+            str(self.rootdir), "1.0.0", "source", "normal", parts={"core": material_boot.__version__, "grub": "0.9.0"}
+        )
+        self.part("grub", install={"default": True}, detect={"found": True, "version": "0.9.0", "how": "source"})
+        self.run_cli("--yes")
+        self.assertEqual(self.hooks_of("install", core=True), ["grub"])
+
+    def test_a_part_with_something_missing_is_repaired(self):
+        self.part(
+            "grub",
+            install={"default": True},
+            detect={"found": True, "version": "1.0.0", "how": "source", "missing": ["the path unit"]},
+        )
+        self.run_cli("--yes")
+        self.assertEqual(self.hooks_of("install", core=True), ["grub"])
+
+    def test_a_package_run_is_never_skipped(self):
+        self.run_cli("--yes", "--from-package", "--only", "grub")
+        self.assertEqual(self.hooks_of("install", core=True), ["grub"])
 
 
 class Parsing(Base):
@@ -401,7 +471,9 @@ class Run(Base):
         for argv, want in (([], False), (["--progress", "json"], True)):
             self.log.unlink(missing_ok=True)
             with mock.patch("sys.__stdout__", io.StringIO()):
-                rc, _ = self.run_cli("--yes", *argv)
+                rc, _ = self.run_cli(
+                    "--yes", "--force", *argv
+                )  # the second run finds the first one's record: --force installs it again
             self.assertEqual(rc, 0)
             self.assertEqual([c["json"] for c in self.calls() if c["hook"] == "install" and c["part"] == "aaa"], [want])
 

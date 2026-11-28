@@ -205,8 +205,91 @@ class Steps(unittest.TestCase):
         for argv in (["--with", "plymouth"], ["--without", "plymouth"], ["--only", "grub"]):
             self.assertNotIn("parts", self.ids(options(*argv)), argv)
 
-    def test_an_update_asks_only_which_parts_and_the_questions_of_a_part_that_is_new(self):
-        self.assertEqual(self.ids(options(), installed={"core", "grub"}), ["parts", "plymouth.no-cmdline"])
+    def visible(self, o, installed=(), force=False, current=None, values=None):
+        parts = make_parts()
+        f = tui.Flow(
+            tui.build_steps(parts, set(installed), o, force, current), o, tui.selected_names(parts, set(installed), o)
+        )
+        if values:
+            f.values.update(values)
+        return [x["id"] for x in f.visible()], f
+
+    def test_an_update_asks_which_parts_then_keep_or_edit_and_the_questions_of_a_part_that_is_new(self):
+        ids, f = self.visible(options(), installed={"core", "grub"})
+        self.assertEqual(
+            ids, ["parts", "keep_edit"]
+        )  # kept: nothing about the look; Plymouth is not ticked, so it asks nothing
+        self.assertEqual(f.values["keep_edit"], "keep")  # the default
+        ids, _f = self.visible(options(), installed={"core", "grub"}, values={"parts": ["grub", "plymouth"]})
+        self.assertEqual(
+            ids, ["parts", "keep_edit", "plymouth.no-cmdline"]
+        )  # ticked: a part new to the machine asks its own question even when kept
+
+    def test_choosing_to_edit_asks_everything_again_for_what_is_installed(self):
+        ids, _f = self.visible(options(), installed={"core", "grub"}, values={"keep_edit": "edit"})
+        self.assertEqual(
+            ids,
+            [
+                "parts",
+                "keep_edit",
+                "STYLE",
+                "SCHEME",
+                "SEED",
+                "LOGO",
+                "HINTS",
+                "grub.res",
+                "grub.gui",
+                "grub.countdown",
+                "grub.timeout",
+            ],
+        )
+
+    def test_editing_starts_from_what_is_set_now(self):
+        current = {
+            "conf": {
+                "STYLE": "split",
+                "SCHEME": "light",
+                "COOKIE": "on",
+                "LOGO": "off",
+                "HINTS": "off",
+                "COUNTDOWN": "off",
+                "TIMEOUT": "7",
+            },
+            "seed": {"mode": "single", "color": "#C62828"},
+        }
+        _ids, f = self.visible(options(), installed={"core", "grub"}, current=current, values={"keep_edit": "edit"})
+        self.assertEqual(
+            {k: f.values[k] for k in ("STYLE", "SCHEME", "SEED", "LOGO", "HINTS", "grub.countdown", "grub.timeout")},
+            {
+                "STYLE": "split",
+                "SCHEME": "light",
+                "SEED": "#C62828",
+                "LOGO": "cookie",
+                "HINTS": "off",
+                "grub.countdown": False,
+                "grub.timeout": "7",
+            },
+        )
+
+    def test_keeping_changes_nothing_about_the_look(self):
+        o = options()
+        _ids, f = self.visible(o, installed={"core", "grub"})
+        f.apply(o)
+        self.assertEqual((o.look, o.seed, o.seed_mode), ({}, None, None))
+        self.assertEqual(o.part_opts, {})
+
+    def test_editing_sends_the_answers_to_the_options(self):
+        o = options()
+        _ids, f = self.visible(
+            o, installed={"core", "grub"}, values={"keep_edit": "edit", "STYLE": "clean", "grub.timeout": "9"}
+        )
+        f.apply(o)
+        self.assertEqual(o.look["STYLE"], "clean")
+        self.assertEqual(o.look["TIMEOUT"], "9")
+
+    def test_a_fresh_machine_has_no_keep_or_edit_question(self):
+        ids, _f = self.visible(options(), installed=set())
+        self.assertNotIn("keep_edit", ids)
 
     def test_tui_forces_the_whole_screen_on_an_update(self):
         self.assertIn("STYLE", self.ids(options("--tui"), installed={"core", "grub"}, force=True))
@@ -890,8 +973,8 @@ class InTheInstaller(InstallerBase):
         out = io.StringIO()
         with (
             redirect_stdout(out),
-            # the parts step, then the summary: there is no third answer to give
-            mock.patch("builtins.input", side_effect=["", "y"]) as asked,
+            # the parts step, keep or edit, then the summary: there is no fourth answer to give
+            mock.patch("builtins.input", side_effect=["", "", "y"]) as asked,
             mock.patch.object(tui, "wanted", return_value=True),
         ):
             rc = installer.main(["--bundle", str(self.bundle), "--root", str(self.rootdir)])

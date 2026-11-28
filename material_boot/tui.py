@@ -52,9 +52,12 @@ def _step(id, title, kind, **kw):
     return s
 
 
-def look_steps(o):
-    """The shared look: the keys every part reads. Only what no flag answered."""
+def look_steps(o, current=None):
+    """The shared look: the keys every part reads. Only what no flag answered. `current` ({"conf": {...}, "seed": {"mode", "color"}}) pre-fills the answers
+    with what is set now, for a person who chose to edit."""
     steps = []
+    cur = (current or {}).get("conf") or {}
+    cur_seed = (current or {}).get("seed") or {}
 
     def conf_step(key, title, options, help="", default=None):
         def apply(o_, v):
@@ -67,7 +70,9 @@ def look_steps(o):
             "choice",
             help=help,
             options=options,
-            default=default or options[0]["value"],
+            default=(cur.get(key) if cur.get(key) in [x["value"] for x in options] else None)
+            or default
+            or options[0]["value"],
             apply=apply,
             flags=lambda v: [flag, v],
             show=lambda v, opts=options: next((x["label"] for x in opts if x["value"] == v), v),
@@ -144,7 +149,9 @@ def look_steps(o):
                 "choice",
                 help="One colour for the whole theme, or every distro in its own colour.",
                 options=opts,
-                default="multi",
+                default=(
+                    cur_seed.get("color") if cur_seed.get("mode") == "single" and cur_seed.get("color") else "multi"
+                ),
                 allow_text=True,
                 pattern=mgseeds.HEX.pattern,
                 apply=apply_seed,
@@ -171,7 +178,13 @@ def look_steps(o):
                     _opt("cookie", "Cookie only", "The cookie shape without the firmware logo."),
                     _opt("none", "Neither", "No cookie and no logo: the top right stays empty."),
                 ],
-                default="both",
+                default=(
+                    "both"
+                    if cur.get("COOKIE", "on") == "on" and cur.get("LOGO", "on") == "on"
+                    else "cookie"
+                    if cur.get("COOKIE", "on") == "on"
+                    else "none"
+                ),
                 apply=apply_logo,
                 flags=lambda v: {"both": [], "cookie": ["--no-logo"], "none": ["--no-cookie", "--no-logo"]}[v],
                 show=lambda v: {"both": "cookie with the firmware logo", "cookie": "cookie only", "none": "neither"}[v],
@@ -195,7 +208,7 @@ def look_steps(o):
                     ),
                     _opt("off", "No key hints", "A cleaner screen; the keys keep working."),
                 ],
-                default="on",
+                default=cur.get("HINTS", "on") if cur.get("HINTS") in ("on", "off") else "on",
                 apply=apply_hints,
                 flags=lambda v: ["--hints"] if v == "on" else ["--no-hints"],
                 show=lambda v: "shown" if v == "on" else "hidden",
@@ -204,7 +217,7 @@ def look_steps(o):
     return steps
 
 
-def part_steps(part, o):
+def part_steps(part, o, current=None):
     """A part's own questions, from its manifest (`install.questions`)."""
     steps = []
     for q in part.questions:
@@ -245,6 +258,10 @@ def part_steps(part, o):
         if q["allow_text"]:
             opts = opts + [_opt(TEXT, "Another value...", "Type it.")]
         default = q["default"]
+        curconf = (current or {}).get("conf") or {}
+        key = tgt.get("conf")
+        if key and key in curconf and curconf[key] != "":  # what is set now (a person who edits starts from it)
+            default = (curconf[key] == "on") if q["kind"] == "toggle" else curconf[key]
         steps.append(
             _step(
                 f"{part.name}.{q['id']}",
@@ -306,22 +323,63 @@ def selected_names(parts, installed, o):
     return (chosen | set(o.with_)) - set(o.without) - {"core"}
 
 
-def build_steps(parts, installed, o, force=False):
-    """-> the steps in order. The look and a part's questions are asked on a fresh system (or with --tui); an update asks only which parts."""
-    fresh = force or not (set(installed) - {"core"})
+KEEP_EDIT = "keep_edit"
+
+
+def keep_edit_step():
+    """On a machine that is set up already: keep what is there, or go through the questions with the current answers filled in."""
+    return _step(
+        KEEP_EDIT,
+        "Your current look and settings",
+        "choice",
+        help="They are kept unless you choose to edit them here. Anything can be changed later in the editor.",
+        options=[
+            _opt("keep", "Keep my current look and settings", "Nothing about the look is asked or changed."),
+            _opt(
+                "edit",
+                "Edit them now",
+                "Style, colours, cookie and logo, hints and each part's questions, starting from what is set now.",
+            ),
+        ],
+        default="keep",
+        flags=lambda v: [],
+        show=lambda v: "kept" if v == "keep" else "edited now",
+    )
+
+
+def build_steps(parts, installed, o, force=False, current=None):
+    """-> the steps in order. Fresh machine (or --tui): which parts, the look, each part's questions. A machine that is set up already: which parts, then ONE
+    question (keep or edit) and, only if the answer is edit, the same questions with the current answers filled in; a part that is new to the machine always
+    asks its own."""
+    updating = not force and bool(set(installed) - {"core"})
+    editing = lambda values: values.get(KEEP_EDIT) == "edit"  # noqa: E731
     steps = []
     ps = parts_step(parts, installed, o)
     if ps:
         steps.append(ps)
-    if fresh:
-        steps += look_steps(o)
+    look = look_steps(o, current)
+    if updating and look:
+        steps.append(keep_edit_step())
+    for st in look:
+        if updating:
+            st["when"] = editing
+        steps.append(st)
     for p in parts:
         if p.name == "core":
             continue
-        for st in part_steps(p, o):
+        for st in part_steps(p, o, current):
             q = next(x for x in p.questions if f"{p.name}.{x['id']}" == st["id"])
-            if q["when"] == "always" or fresh or p.name not in installed:
+            known = p.name in installed
+            if q["when"] == "always" or not known:
+                steps.append(st)  # a part new to the machine, or a question that is always asked
+            elif updating:
+                if not any(x["id"] == KEEP_EDIT for x in steps):
+                    steps.append(keep_edit_step())
+                inner = st["when"]
+                st["when"] = lambda values, inner=inner: editing(values) and inner(values)
                 steps.append(st)
+            else:
+                steps.append(st)  # --tui on an update: the whole screen
     return steps
 
 
@@ -960,9 +1018,9 @@ def wanted(o, tty=None):
     return bool(tty)
 
 
-def run(parts, installed, o, say=print, inp=input, plain=None, tty=None, record=None):
+def run(parts, installed, o, say=print, inp=input, plain=None, tty=None, record=None, current=None):
     """Ask, apply the answers to `o`. -> True to go on, False when cancelled. Nothing is written here."""
-    steps = build_steps(parts, installed, o, force=o.tui is True)
+    steps = build_steps(parts, installed, o, force=o.tui is True, current=current)
     if not steps:
         return True
     flow = Flow(steps, o, selected_names(parts, installed, o), existing_lines(parts, installed, record))
@@ -990,4 +1048,11 @@ def run(parts, installed, o, say=print, inp=input, plain=None, tty=None, record=
         return False
     flow.apply(o)
     o.confirmed = True  # the summary was the confirmation: the installer does not ask `Continue?` again
+    if not use_plain:  # a curses screen leaves nothing behind: what was chosen is written to the scrollback
+        say("")
+        say("What you chose:")
+        for title, value in flow.summary():
+            say(f"  {title + ':':<30}{value}")
+        if flow.settings():
+            say("  also written to the settings: " + " ".join(f"{k}={v}" for k, v in flow.settings().items()))
     return True
