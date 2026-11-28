@@ -11,6 +11,8 @@ BuildArch:      noarch
 Requires:       python3
 Requires:       python3-pillow
 Requires:       librsvg2-tools
+Recommends:     polkit
+Obsoletes:      material-grub-gui
 
 %description
 The shared code of the Material boot parts (palettes, the scene renderer, the conf and overrides formats, presets, the state record and the
@@ -38,6 +40,9 @@ if [ $1 -eq 0 ]; then /usr/bin/material-boot core install --from-package --unins
 %{_datadir}/material-boot/scripts
 %{_datadir}/material-boot/assets
 %dir %{_datadir}/material-boot/plugins.d
+%{_libexecdir}/material-boot-ui-helper
+%{_datadir}/polkit-1/actions/org.material-boot.ui.policy
+%{_datadir}/applications/material-boot.desktop
 
 %changelog
 * Sat Nov 28 2026 LucaCraft89 <noreply@users.noreply.github.com> - 1.1.1-1

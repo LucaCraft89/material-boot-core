@@ -10,6 +10,9 @@ Rules-Requires-Root: no
 Package: material-boot-core
 Architecture: all
 Depends: ${misc:Depends}, python3 (>= 3.9), python3-pil, librsvg2-bin
+Recommends: polkitd | policykit-1
+Replaces: material-grub-gui
+Breaks: material-grub-gui
 Description: The code and the command that Material GRUB and Material Plymouth share
  The shared code of the Material boot parts (palettes, the scene renderer, the
  conf and overrides formats, presets, the state record and the migrations), the

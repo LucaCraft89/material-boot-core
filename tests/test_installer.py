@@ -364,6 +364,21 @@ class Selection(Base):
     def test_a_fresh_system_gets_the_defaults(self):
         self.assertEqual(self.sel()[0], ["grub"])
 
+    def test_the_editor_is_a_default_only_on_a_desktop_and_can_be_left_out(self):
+        from material_boot import coreinstall, uipart
+
+        def pick(env, *argv):
+            parts = [*self.parts, coreinstall.part(), uipart.part(env=env, root=self.tmp_root)]
+            o, errs = installer.parse_args(argv, parts)
+            self.assertEqual(errs, [])
+            return [p.name for p in installer.select(parts, set(), o)[0]]
+
+        self.tmp_root = self.bundle  # an empty directory: no session files
+        self.assertEqual(pick({"DISPLAY": ":0"}), ["core", "grub", "ui"])
+        self.assertEqual(pick({"DISPLAY": ":0"}, "--without", "ui"), ["core", "grub"])
+        self.assertEqual(pick({}), ["core", "grub"])
+        self.assertEqual(pick({}, "--with", "ui"), ["core", "ui"])
+
     def test_choosing_a_part_on_a_fresh_system_means_only_that_one(self):
         self.assertEqual(
             self.sel("--with", "plymouth")[0], ["plymouth"]

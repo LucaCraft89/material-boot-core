@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
-from . import __version__, coreinstall, detect, migrate, plugins, progress, state, tui
+from . import __version__, coreinstall, detect, migrate, plugins, progress, state, tui, uipart
 from . import conf as mgconf
 from . import overrides as mgoverrides
 from . import seeds as mgseeds
@@ -652,6 +652,7 @@ def available_parts(bundle=None):
     """Every part that can be installed: the bundle's (when there is one) and the installed ones; a bundle's record wins, it is the version to install."""
     found = {p.name: p for p in plugins.discover()}
     found["core"] = coreinstall.part()  # the core is a part like the others, and the first
+    found["ui"] = uipart.part(layout=system_layout())  # the editor's launcher: the core's, on by default on a desktop
     for p in plugins.discover_bundle(bundle) if bundle else []:
         found[p.name] = p
     return [found[k] for k in sorted(found)]

@@ -105,8 +105,8 @@ class Layout(unittest.TestCase):
         self.assertFalse((self.dest / "usr/share/material-boot/data").exists())  # built on the machine, for the scheme
 
     def test_everything_the_spec_lists_exists_and_nothing_else_is_shipped(self):
-        listed = re.findall(r"^(%dir )?%\{_(bindir|datadir)\}/?(\S*)$", SPEC, re.M)
-        roots = {"bindir": "usr/bin", "datadir": "usr/share"}
+        listed = re.findall(r"^(%dir )?%\{_(bindir|datadir|libexecdir)\}/?(\S*)$", SPEC, re.M)
+        roots = {"bindir": "usr/bin", "datadir": "usr/share", "libexecdir": "usr/libexec"}
         paths = [self.dest / roots[kind] / rest for _dir, kind, rest in listed]
         self.assertTrue(paths)
         for p in paths:

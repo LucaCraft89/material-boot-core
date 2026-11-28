@@ -13,7 +13,7 @@ A part's repository keeps its manifest in `material-boot-part.json` at its root 
 The build refuses a part whose manifest is not usable, so a bundle never holds a part that the installer would then refuse.
 
 The tree: install.sh, VERSION, BUNDLE.json (what is in it, from where, at which commit), SHA256SUMS, lib/material_boot, bin/material-boot, scripts/build_data.py,
-assets/, parts/<name>/ (the part's repository, with its manifest also as manifest.json).
+assets/, ui/ (the editor's launcher, helper, policy), parts/<name>/ (the part's repository, with its manifest also as manifest.json).
 """
 
 import gzip
@@ -74,6 +74,9 @@ def copy_core(stage):
     shutil.copy(ROOT / "bin/material-boot", stage / "bin/material-boot")
     for f in ("LICENSE", "THIRD_PARTY.md", "VERSION"):
         shutil.copy(ROOT / f, stage / f)
+    shutil.copytree(
+        ROOT / "packaging/ui", stage / "ui"
+    )  # the editor's launcher, helper and polkit policy (the ui part installs them)
     shutil.copy(ROOT / "packaging/bundle/install.sh", stage / "install.sh")
     os.chmod(stage / "install.sh", 0o755)
     os.chmod(stage / "bin/material-boot", 0o755)

@@ -12,3 +12,8 @@ install -m644 "$src/VERSION" "$p/lib/material_boot/VERSION"
 install -m755 "$src/scripts/build_data.py" "$p/scripts/build_data.py"
 cp -a "$src/assets" "$p/assets"
 install -m755 "$src/bin/material-boot" "$dest/usr/bin/material-boot"
+# the editor's launcher, its helper and the polkit policy (what `ui` installs from a bundle)
+install -d "$dest/usr/libexec" "$dest/usr/share/polkit-1/actions" "$dest/usr/share/applications"
+install -m755 "$src/packaging/ui/material-boot-ui-helper" "$dest/usr/libexec/material-boot-ui-helper"
+install -m644 "$src/packaging/ui/org.material-boot.ui.policy" "$dest/usr/share/polkit-1/actions/org.material-boot.ui.policy"
+install -m644 "$src/packaging/ui/material-boot.desktop" "$dest/usr/share/applications/material-boot.desktop"
