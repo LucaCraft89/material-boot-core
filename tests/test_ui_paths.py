@@ -73,5 +73,32 @@ class GrubModules(unittest.TestCase):
             self.assertEqual(paths.grub_modules(), bin_)
 
 
+class PartInfo(unittest.TestCase):
+    """What the editor tells its page about the parts: the page shows GRUB's pages (and the menu preview) only when GRUB is there."""
+
+    def test_installed_or_not(self):
+        from material_boot.ui import state
+
+        with tempfile.TemporaryDirectory() as t:
+            with mock.patch.dict(os.environ, {"MATERIAL_PLUGIN_PATH": t}):
+                self.assertFalse(state.part_info("grub")["installed"])
+                (Path(t) / "entry.py").write_text("def main(a, c):\n    return 0\n")
+                (Path(t) / "grub.json").write_text(
+                    json.dumps(
+                        {
+                            "manifest": 2,
+                            "name": "grub",
+                            "title": "GRUB",
+                            "version": "1.2.0",
+                            "core_api": 2,
+                            "entry": str(Path(t) / "entry.py"),
+                        }
+                    )
+                )
+                info = state.part_info("grub")
+                self.assertEqual((info["installed"], info["version"]), (True, "1.2.0"))
+                self.assertFalse(state.part_info("plymouth")["installed"])
+
+
 if __name__ == "__main__":
     unittest.main()

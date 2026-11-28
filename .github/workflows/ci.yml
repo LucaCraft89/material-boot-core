@@ -18,6 +18,7 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: actionlint
+      - run: for f in material_boot/ui/web/*.js; do node --check "$f"; done      # the editor's front end has no build step: a syntax error would only show in the browser
 
   unit:
     name: Unit tests (Python ${{ matrix.python }})

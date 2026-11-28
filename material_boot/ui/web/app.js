@@ -635,6 +635,8 @@ function runJob(title, start, after) {
 
 // ---------------------------------------------------------------- Live preview
 function previewPane() {
+  if (S.srv.grub && S.srv.grub.installed === false) // a machine with only the boot splash: the menu preview is GRUB's
+    return h("aside", { class: "preview card" }, h("div", { class: "card-head" }, h("h2", {}, "Live preview")), h("p", { class: "muted" }, "The menu preview needs Material GRUB, which is not installed here. The Boot splash page has its own preview."));
   const e = S.srv.entries.find((x) => x.class === S.sel) || S.srv.entries[0];
   const frame = h("div", { class: "frame loading", id: "frame" }, h("img", { id: "pv-a", alt: "Preview of the boot menu", style: { opacity: 0 } }), h("img", { id: "pv-b", alt: "", style: { opacity: 0 } }));
   const tops = topRows();
