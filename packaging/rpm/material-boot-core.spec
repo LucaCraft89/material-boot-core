@@ -1,7 +1,7 @@
 # The RPM ships the library, the command and the build inputs; the shared data (palettes, glyphs, the font) is built on the target machine in %posttrans,
 # for the configured scheme (material-boot core install --from-package --only core), so nothing prebuilt is downloaded. COPR builds this spec from the tag.
 Name:           material-boot-core
-Version:        1.1.1
+Version:        1.2.0
 Release:        1%{?dist}
 Summary:        The code and the command that Material GRUB and Material Plymouth share
 License:        MIT
@@ -46,6 +46,9 @@ if [ $1 -eq 0 ]; then /usr/bin/material-boot core install --from-package --unins
 %{_datadir}/applications/material-boot.desktop
 
 %changelog
+* Sat Nov 28 2026 LucaCraft89 <noreply@users.noreply.github.com> - 1.2.0-1
+- The editor moves into the core (material-boot ui); `material-grub` is gone; one installer view; keep-or-edit on an update; help from one table.
+
 * Sat Nov 28 2026 LucaCraft89 <noreply@users.noreply.github.com> - 1.1.1-1
 - Fix: a part named in the state record that nobody provides (the 0.7.x graphical editor) no longer crashes the installer; the screen lists what is installed and where to customise further.
 

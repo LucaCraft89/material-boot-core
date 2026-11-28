@@ -1,3 +1,10 @@
+material-boot-core (1.2.0) unstable; urgency=medium
+
+  * The editor moves into the core (material-boot ui), the old material-grub command is
+    gone, one installer view, keep-or-edit on an update, help from one table.
+
+ -- LucaCraft89 <noreply@users.noreply.github.com>  Sat, 28 Nov 2026 12:00:00 +0000
+
 material-boot-core (1.1.1) unstable; urgency=medium
 
   * Fix: a part named in the state record that nobody provides (the 0.7.x
