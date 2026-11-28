@@ -14,6 +14,12 @@
 
 **Using it afterwards, five ways in:** `material-boot` (a curses menu), `material-grub` (the older front end with its **own** menu and its own `help`), `material-grub-*` helper scripts, `material-boot grub|plymouth ...` module commands, and `material-grub gui` (the web editor) with its own desktop icon. The editor is **not known to `material-boot`**: it is not a part, has no command and is not in the menu, so after a move to `material-boot` it looks like it vanished.
 
+**An install touches everything, every time.** Adding Plymouth to a machine that had GRUB re-rendered the whole GRUB theme (about 50 seconds), regenerated `grub.cfg` and reinstalled the core at the same version, although nothing about them had changed. That is slow and it is the boot configuration being rewritten for no reason.
+
+**A menu followed by plain prompts.** `material-boot` opens a curses menu whose entries then ask in plain `change one, like STYLE=list` lines, and tab completion offers both `material-boot` and `material-grub`.
+
+**The closing hint is long and sometimes wrong** (it told a person who has an editor to install it).
+
 **Old installs are not cleaned.** The `material-grub` command, the "Material GRUB" launcher icon and the 0.7.x editor files stay (the command on purpose: hooks, the path unit and the polkit helper call it; the icon and the old editor tree because nothing removes them). An old editor may even be running against a newer core.
 
 **`--help` is partial**: some commands list their options, the installer's options are scattered (`--grub-*`, `--plymouth-*`, bare names), and nothing checks the help against the options that exist.
@@ -32,9 +38,10 @@
 ### 3.1 Installing
 `./install.sh` (or a package) is **two screens and one progress view**:
 1. **What to install and what is here.** The parts (GRUB, Plymouth, the Editor) with what is installed already, its version and what the run will do, plus the few system choices (an immutable system, a Ventoy stick).
-2. **The look**, the same questions the screen asks today (style, scheme, seed colour or one per entry, cookie and logo, hints) and each part's own (resolution, countdown, timeout, Plymouth bar and motion), with the preview. **Fresh machine: asked.** **Already set up: one question first, "Keep your current look and settings, or edit them now?"**, and only if the answer is *edit* do the questions follow, pre-filled with what is set. A part that is new to the machine always asks its own questions.
+2. **Only what changes is touched.** A part that is already installed at the same version, and that the person did not ask to edit, is skipped (the core and GRUB are not reinstalled to add Plymouth); `--force` reinstalls. The progress view lists what was skipped and why.
+2b. **The look**, the same questions the screen asks today (style, scheme, seed colour or one per entry, cookie and logo, hints) and each part's own (resolution, countdown, timeout, Plymouth bar and motion), with the preview. **Fresh machine: asked.** **Already set up: one question first, "Keep your current look and settings, or edit them now?"**, and only if the answer is *edit* do the questions follow, pre-filled with what is set. A part that is new to the machine always asks its own questions.
 3. **Progress, one view for all parts.** The core already can consume a part's progress as events (`--progress json` is what the editor reads); GRUB's engine and Plymouth report through it and the core draws it: `Step 3 of 7, Rendering the theme`, with the log kept below. The engine's own banner is not shown.
-4. **A closing screen that stays in the scrollback**: what was installed or changed, what was found and removed from an older install (3.4), and the next step: *"Customise further in your browser: `material-boot ui`"*, with an "open it now?" when a graphical session is detected.
+4. **A closing screen that stays in the scrollback**: what was installed, changed or skipped, what was found and removed from an older install (3.4), and the next step: *"Customise further in your browser: `material-boot ui`"*, with an "open it now?" when a graphical session is detected.
 
 Non-interactive stays as it is: `--yes`, `--dry-run`, `--no-tui`, `--progress json`, the options per part. `--tui` is no longer needed (the screen always asks, by the rule above). The summary still prints the equivalent command line.
 
