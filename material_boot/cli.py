@@ -2,10 +2,11 @@
 
     material-boot                       a menu of everything below (a terminal UI)
     material-boot core <command> ...    the settings and tools of the whole system (material_boot/commands.py): conf, colour, overrides, apply, doctor, parts
-    material-boot <part> <command> ...  an installed part: grub, plymouth, gui, ... (docs/plugins.md); a part that is not installed has no module
+    material-boot <part> <command> ...  an installed part: grub, plymouth, ... (docs/plugins.md); a part that is not installed has no module
+    material-boot ui                    the editor in your browser: every setting of every part
     material-boot help | version | menu
 
-Only help, version and menu are top-level words: they must work with nothing installed. Everything else belongs to a module, so the dispatcher has no
+Only help, version, menu and ui are top-level words: they must work with nothing installed. Everything else belongs to a module, so the dispatcher has no
 special cases: `core` is just the module that is always there.
 """
 
@@ -18,12 +19,11 @@ from pathlib import Path
 from . import CORE_API, __version__, plugins
 
 PROG = "material-boot"
-TOP = ("help", "version", "menu")
+TOP = ("help", "version", "menu", "ui")
 # Parts that are known by name, so that asking for one that is not installed gets an answer instead of "unknown command": name -> (what it is, package).
 KNOWN_PARTS = {
     "grub": ("the GRUB theme", "material-grub"),
     "plymouth": ("the Plymouth boot splash", "material-plymouth"),
-    "gui": ("the graphical editor", "material-grub-gui"),
 }
 
 
@@ -111,6 +111,9 @@ def c_part(name, argv):
 
     p = plugins.find(name)
     if p is None:
+        if name == "gui":
+            say(f"{PROG}: the editor is now one command for every part:  {PROG} ui")
+            return 2
         if name in KNOWN_PARTS:
             what, pkg = KNOWN_PARTS[name]
             say(f"{PROG}: {what} is a part and it is not installed (package: {pkg}).")
@@ -139,6 +142,10 @@ def main(argv=None):
         return c_help(rest)
     if cmd in ("-V", "--version", "version"):
         return c_version(rest)
+    if cmd == "ui":
+        from .ui import command
+
+        return command.main(rest)
     if cmd == "core":
         from . import commands
 

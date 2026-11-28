@@ -1,0 +1,7 @@
+#!/bin/sh
+# The one program the editor runs as root (through pkexec, see org.material-boot.ui.policy). It reads one JSON request on stdin; the code and its checks are
+# material_boot/ui/helper.py. This shim only finds Python and the library, like /usr/bin/material-boot does, and ignores the caller's environment.
+LIB=/usr/share/material-boot/lib
+PY=python3
+[ -f /var/lib/material-grub/env ] && . /var/lib/material-grub/env
+exec env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin PYTHONPATH="$LIB" "$PY" -m material_boot.ui.helper

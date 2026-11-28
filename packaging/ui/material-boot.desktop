@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Material Boot
+GenericName=Boot look editor
+Comment=Customise the boot menu and the boot splash: styles, colours, names, order, Ventoy sticks
+Exec=material-boot ui
+Icon=preferences-desktop-theme
+Terminal=false
+Categories=Settings;System;
+Keywords=grub;plymouth;boot;theme;ventoy;

@@ -62,8 +62,8 @@ class Base(unittest.TestCase):
 
 
 class TopLevel(Base):
-    def test_only_help_version_and_menu_are_top_level(self):
-        self.assertEqual(cli.TOP, ("help", "version", "menu"))
+    def test_only_help_version_menu_and_ui_are_top_level(self):
+        self.assertEqual(cli.TOP, ("help", "version", "menu", "ui"))
 
     def test_version_lists_the_usable_parts(self):
         self.part("plymouth", version="1.2.3")
@@ -101,10 +101,15 @@ class TopLevel(Base):
         self.assertNotIn("unknown command", out)
 
     def test_a_known_part_that_is_not_installed_says_which_package(self):
-        for name, pkg in (("grub", "material-grub"), ("plymouth", "material-plymouth"), ("gui", "material-grub-gui")):
+        for name, pkg in (("grub", "material-grub"), ("plymouth", "material-plymouth")):
             rc, out, _ = self.call(name)
             self.assertEqual(rc, 1, name)
             self.assertIn(f"package: {pkg}", out)
+
+    def test_the_old_gui_word_points_to_the_editor(self):
+        rc, out, _ = self.call("gui")
+        self.assertEqual(rc, 2)
+        self.assertIn("material-boot ui", out)
 
     def test_a_part_that_cannot_be_used_says_why(self):
         self.part("plymouth", core_min="99.0.0")
