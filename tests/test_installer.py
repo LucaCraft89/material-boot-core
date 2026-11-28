@@ -170,6 +170,27 @@ class Base(unittest.TestCase):
         return rc, out.getvalue()
 
 
+class UnknownInstalledPart(Base):
+    """A real machine: the state record lists 'gui' (the graphical editor of 0.7.x) but no manifest provides it. It crashed with KeyError: 'gui'."""
+
+    def test_a_part_in_the_record_that_nobody_provides_is_ignored(self):
+        self.part("grub", install={"default": True})
+        state.record(
+            str(self.rootdir), "1.0.0", "source", "normal", parts={"core": "1.0.0", "grub": "1.0.0", "gui": "0.7.1"}
+        )
+        rc, out = self.run_cli("--yes")
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("Traceback", out)
+        self.assertEqual(self.hooks_of("install"), ["grub"])
+
+    def test_select_itself_ignores_it(self):
+        self.part("grub", install={"default": True})
+        parts = plugins.discover_bundle(self.bundle)
+        o, errors = installer.parse_args([], parts)
+        chosen, _notes, errs = installer.select(parts, {"grub", "gui"}, o)
+        self.assertEqual((errs, [p.name for p in chosen]), ([], ["grub"]))
+
+
 class Parsing(Base):
     def parts(self):
         self.part(

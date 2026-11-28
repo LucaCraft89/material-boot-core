@@ -325,6 +325,64 @@ def build_steps(parts, installed, o, force=False):
     return steps
 
 
+# ---------------------------------------------------------------- what is there already, and where to go next
+def _record_version(entry):
+    return entry.get("version") if isinstance(entry, dict) else entry
+
+
+def existing_lines(parts, installed, record=None):
+    """What Material Boot already has on this system, for the top of the screen: one line per part that is installed, with its version and what this run
+    would do to it, or one line saying there is nothing yet."""
+    record = record or {}
+    out = []
+    for p in parts:
+        if p.name == "core" or p.name not in installed:
+            continue
+        have = _record_version(record.get(p.name))
+        if not have or str(have) in ("?", ""):
+            out.append(f"{p.title}: installed (this run brings {p.version})")
+            continue
+        try:
+            from .plugins import version_tuple
+
+            order = (version_tuple(str(have)) > version_tuple(p.version)) - (
+                version_tuple(str(have)) < version_tuple(p.version)
+            )
+        except Exception:
+            order = 0 if str(have) == p.version else -1
+        what = (
+            "will be updated"
+            if order < 0
+            else "the same version: it will be installed again"
+            if order == 0
+            else "NEWER than this one: it will not be downgraded"
+        )
+        out.append(f"{p.title} {have}: {what}" + (f" to {p.version}" if order < 0 else ""))
+    core = _record_version(record.get("core"))
+    if out and core:
+        out.append(f"Your settings (look, colours, entries, presets) are kept. The core is {core}.")
+    return out or ["Nothing from Material Boot is installed yet."]
+
+
+def after_lines(selected=()):
+    """Where to customise further once it is installed (shown in the summary and after the install)."""
+    lines = [
+        "material-boot core colour       one seed colour for everything, or a colour per entry",
+        "material-boot core overrides    names, colours and icons of single entries, their order and which are hidden",
+        "material-boot core presets      save the look under a name, apply it again, move it to another machine",
+        "material-boot core conf         the shared settings (countdown, timeout, hints, Plymouth bar and motion ...)",
+    ]
+    if not selected or "grub" in selected:
+        lines.append(
+            "material-grub gui               the graphical editor with a live preview of all of it (if you installed it:"
+        )
+        lines.append("                                run this installer again, or `--grub-with-gui`)")
+    lines.append(
+        "./install.sh --tui              this screen again with every look question, on a machine that is set up already"
+    )
+    return lines
+
+
 # ---------------------------------------------------------------- the state machine
 def default_value(s):
     if s["kind"] == "multi":
@@ -338,8 +396,9 @@ class Flow:
     """One run of the screen. `key(k)` takes a key name: up down left right enter space esc backspace quit, or a printable character; returns None,
     "done" (confirmed) or "cancel". `rows(w, h)` is what to draw."""
 
-    def __init__(self, steps, o=None, parts_selected=None):
+    def __init__(self, steps, o=None, parts_selected=None, found=None):
         self.steps = steps
+        self.found = list(found or [])
         self.values = {s["id"]: default_value(s) for s in steps}
         if "parts" not in self.values:
             self.values["parts"] = sorted(parts_selected or [])
@@ -490,6 +549,8 @@ class Flow:
         if s is None:
             return rows + self._summary_rows(w)
         rows.append([(s["title"], "title")])
+        if self.i == 0 and self.found:
+            rows += [[("  On this system:", "dim")]] + [[("    " + ln, "item")] for ln in self.found] + [[]]
         if s["help"]:
             rows += [[(ln, "dim")] for ln in wrap(s["help"], w - 4)]
         rows.append([])
@@ -562,6 +623,8 @@ class Flow:
 
     def _summary_rows(self, w):
         rows = [[("Ready to install", "title")], []]
+        if self.found:
+            rows += [[("  On this system:", "dim")]] + [[("    " + ln, "item")] for ln in self.found] + [[]]
         for t, v in self.summary():
             rows.append([(f"  {t + ':':<28}", "dim"), (v, "item")])
         rows += [[], [("The same thing without this screen:", "dim")]]
@@ -575,6 +638,8 @@ class Flow:
                     )
                 ]
             ]
+        rows += [[], [("After the install, more customisation:", "dim")]]
+        rows += [[("  " + ln, "dim")] for ln in after_lines(self.values.get("parts"))]
         rows.append([])
         for n, label in enumerate(("Install", "Back", "Cancel")):
             rows.append(
@@ -794,6 +859,10 @@ def run_curses(flow):
 
 def run_plain(flow, inp=input, out=print):
     """The same questions as plain prompts (no colours, no curses: a pipe, TERM=dumb, a tiny terminal). Empty answer = the default; `b` = back; `q` = quit."""
+    if flow.found:
+        out("On this system:")
+        for ln in flow.found:
+            out("  " + ln)
     while True:
         s = flow.current()
         if s is None:
@@ -803,6 +872,9 @@ def run_plain(flow, inp=input, out=print):
                 out(f"  {t}: {v}")
             out("The same thing without this screen:")
             out("  " + flow.command())
+            out("After the install, more customisation:")
+            for ln in after_lines(flow.values.get("parts")):
+                out("  " + ln)
             if flow.settings():
                 out("  and in /etc/material-grub.conf: " + " ".join(f"{k}={v}" for k, v in flow.settings().items()))
             try:
@@ -888,12 +960,12 @@ def wanted(o, tty=None):
     return bool(tty)
 
 
-def run(parts, installed, o, say=print, inp=input, plain=None, tty=None):
+def run(parts, installed, o, say=print, inp=input, plain=None, tty=None, record=None):
     """Ask, apply the answers to `o`. -> True to go on, False when cancelled. Nothing is written here."""
     steps = build_steps(parts, installed, o, force=o.tui is True)
     if not steps:
         return True
-    flow = Flow(steps, o, selected_names(parts, installed, o))
+    flow = Flow(steps, o, selected_names(parts, installed, o), existing_lines(parts, installed, record))
     use_plain = plain
     if use_plain is None:
         use_plain = os.environ.get("TERM", "dumb") in ("dumb", "") or not (sys.stdin.isatty() and sys.stdout.isatty())

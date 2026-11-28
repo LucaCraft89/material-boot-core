@@ -168,6 +168,9 @@ def select(parts, installed, o):
     parts whose manifest says install.default (unless `--with` chose some); plus `--with`, minus `--without`; `needs` is followed."""
     by = {p.name: p for p in parts}
     errors, notes = [], []
+    # the state record can name a part nobody provides now (the graphical editor of 0.7.x, a package that was removed): there is nothing to select, update or
+    # follow `needs` of, so it is left out instead of failing (a KeyError on a real machine: 'gui')
+    installed = {n for n in installed if n in by}
 
     def needs_of(p):
         # every part needs the core (its library, its data, its command), and the core is installed first
@@ -515,6 +518,10 @@ class Installer:
             self.say(
                 "Parts that were installed stay installed; a failed part rolled itself back. Run again to retry the rest."
             )
+        if ok and by.get("installed") and not self.o.dry_run and not self.o.json and not self.o.uninstall:
+            self.say("\nMore customisation, any time:")
+            for ln in tui.after_lines([p.name for p in self.parts]):
+                self.say("  " + ln)
 
     def run(self):
         o = self.o
@@ -586,8 +593,11 @@ def main(argv, say=print, ask=None):
         return 0
     # installed = a manifest in a plugin directory, or a part the state record knows (a half-removed part still counts: it has to be repaired or removed)
     installed = {p.name for p in plugins.discover()} | set((state.read(o.root) or {}).get("parts") or {})
+    installed &= {
+        p.name for p in parts
+    }  # a name in the state record that no part provides is not installable (see select)
     if not errors and tui.wanted(o):
-        if not tui.run(parts, installed, o, say=say, inp=ask or input):
+        if not tui.run(parts, installed, o, say=say, inp=ask or input, record=(state.read(o.root) or {}).get("parts")):
             return 1
     chosen, notes, serr = select(parts, installed, o)
     errors += serr

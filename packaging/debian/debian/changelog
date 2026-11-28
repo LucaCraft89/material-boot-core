@@ -1,3 +1,11 @@
+material-boot-core (1.1.1) unstable; urgency=medium
+
+  * Fix: a part named in the state record that nobody provides (the 0.7.x
+    graphical editor) no longer crashes the installer.
+  * The installer screen lists what is installed and where to customise further.
+
+ -- LucaCraft89 <noreply@users.noreply.github.com>  Sat, 28 Nov 2026 12:00:00 +0000
+
 material-boot-core (1.1.0) unstable; urgency=medium
 
   * The installer screen: parts checklist, the shared look with a preview, and
