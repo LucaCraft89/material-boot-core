@@ -116,6 +116,28 @@ jobs:
         with: {name: "package-${{ matrix.fmt }}", path: build/out/}
 
 
+  editor:
+    # The editor in a real browser (Chrome, driven by Playwright): every page, the live preview, drag and drop, edits, Apply through the real helper (scratch root,
+    # fake `material-boot`), a failing Apply, Ventoy (drawn with the real GRUB package), the update page, phone width, dark and light, and the browser-side
+    # security. The GRUB part is checked out beside this repository: the entry preview and the Ventoy pages are its. Screenshots are artifacts.
+    name: The editor in Chrome (end to end)
+    runs-on: ubuntu-latest
+    env:
+      PART_GRUB_REF: ${{ vars.PART_GRUB_REF || 'release/1.2.0' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: {repository: LucaCraft89/material-grub, ref: "${{ env.PART_GRUB_REF }}", path: parts-grub}
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil librsvg2-bin grub-common
+      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install playwright   # test tooling only; the browser is the runner's Chrome
+      - run: ln -sfn "$GITHUB_WORKSPACE" parts-grub/material-boot-core && cd parts-grub && python3 scripts/package.py --res 1920x1080   # the part finds the core next to it
+      - run: >
+          MATERIAL_GRUB_SRC="$PWD/parts-grub" MATERIAL_GRUB_PKG="$PWD/parts-grub/dist/material-grub"
+          GUI_BROWSER=/usr/bin/google-chrome .venv/bin/python tests/ui_e2e.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: editor-screenshots, path: build/ui-shots/}
+
   bundle:
     # The whole unified installer, for real: a bundle made of this core and the REAL parts (material-grub, material-plymouth, from the refs below), installed in a
     # distro container with a fake /boot: a dry run changes nothing; GRUB is installed (the default part), then Plymouth (a real initramfs rebuild with the

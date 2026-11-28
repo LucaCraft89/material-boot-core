@@ -86,18 +86,18 @@ def overrides_icons(ov_path=None):
 
 
 def installed_version(pkg):
-    try:
-        return (pkg / "VERSION").read_text().strip() if pkg else None
-    except OSError:
-        return None
+    """The version of Material Boot itself (the editor is the core's)."""
+    from .. import __version__
+
+    return __version__ if pkg else None
 
 
-def plymouth_info():
-    """What the GUI needs to know about the optional Plymouth part: {installed, version, title, problem}. Never raises: a broken part is a message, not a crash."""
+def part_info(name):
+    """What the editor needs to know about an optional part: {installed, version, title, problem}. Never raises: a broken part is a message, not a crash."""
     try:
         from .. import plugins as mgplugins
 
-        rec = mgplugins.find("plymouth")
+        rec = mgplugins.find(name)
     except Exception as e:  # a plugin directory that cannot be read must not take the GUI down
         return {"installed": False, "version": "", "title": "", "problem": f"could not look for plugins: {e}"}
     if rec is None:
@@ -108,6 +108,10 @@ def plymouth_info():
         "title": getattr(rec, "title", "") or "",
         "problem": rec.problem or "",
     }
+
+
+def plymouth_info():
+    return part_info("plymouth")
 
 
 def read_state(pkg):
@@ -134,7 +138,8 @@ def read_state(pkg):
         "seeds": [{"name": n, "color": h} for n, h in mgseeds.SEEDS],
         "groups": list(mgoverrides.GROUPS),
         "choices": {k: list(v) for k, v in mgrub.CONF_CHOICES.items() if k in CONF_KEYS},
-        "plymouth": plymouth_info(),
+        "plymouth": part_info("plymouth"),
+        "grub": part_info("grub"),
     }
 
 

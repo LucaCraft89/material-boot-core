@@ -27,8 +27,15 @@ const VIEWS = [
   ["update", "Update", "update"],
   ["logs", "Logs", "logs"],
 ];
-// The Boot splash page exists only when the optional Plymouth part is installed (the server says so in /api/state).
-const views = () => (S.srv?.plymouth?.installed ? [...VIEWS.slice(0, 4), ["plymouth", "Boot splash", "plymouth"], ...VIEWS.slice(4)] : VIEWS);
+// Each part brings its own pages: Style, Entries and Ventoy are GRUB's and exist only when the GRUB part is installed; Boot splash only with the Plymouth part
+// (the server says which parts there are in /api/state). Colours, Presets, Update and Logs are the whole system's.
+const GRUB_PAGES = ["style", "entries", "ventoy"];
+const views = () => {
+  const grub = S.srv?.grub?.installed !== false;
+  const v = VIEWS.filter((x) => grub || !GRUB_PAGES.includes(x[0]));
+  const at = v.findIndex((x) => x[0] === "ventoy" || x[0] === "presets");
+  return S.srv?.plymouth?.installed ? [...v.slice(0, at), ["plymouth", "Boot splash", "plymouth"], ...v.slice(at)] : v;
+};
 const dirty = () => JSON.stringify(S.draft) !== S.base;
 const GROUPS = { linux: "Linux", windows: "Windows", system: "Firmware & power" };
 
@@ -109,7 +116,7 @@ function render(enter = false) {
 function renderRail() {
   const rail = document.getElementById("rail");
   rail.replaceChildren(
-    h("div", { class: "brand" }, icon("cookie"), h("div", {}, h("b", {}, "Material GRUB"), h("small", {}, S.srv.version ? "v" + S.srv.version : "not installed"))),
+    h("div", { class: "brand" }, icon("cookie"), h("div", {}, h("b", {}, "Material Boot"), h("small", {}, S.srv.version ? "v" + S.srv.version : "not installed"))),
     ...views().map(([id, label, ic]) =>
       h("button", { class: "nav", "aria-current": S.view === id ? "page" : false, onClick: () => go(id) }, icon(ic), h("span", {}, label), id === "entries" && S.draft.overrides.entries.length ? h("span", { class: "badge" }, S.draft.overrides.entries.length) : null),
     ),
@@ -132,13 +139,13 @@ function renderTop() {
       dirty() ? h("button", { class: "btn text small", onClick: () => { S.draft = JSON.parse(S.base); render(); toast("Changes discarded"); } }, icon("reset"), "Discard") : null,
     ].filter(Boolean),
   );
-  document.title = (dirty() ? "• " : "") + title + " · Material GRUB";
+  document.title = (dirty() ? "• " : "") + title + " · Material Boot";
 }
 function renderFab() {
   const f = document.getElementById("fabbar");
   if (S.view === "ventoy") return f.replaceChildren(); // the stick has its own button
   f.replaceChildren(
-    h("button", { class: "btn fab" + (dirty() ? " attention" : ""), disabled: !dirty() || !S.srv.installed, onClick: applyDraft, title: dirty() ? "Write your changes to GRUB (asks for your password or fingerprint)" : "Nothing to apply yet" }, icon("apply"), "Apply to GRUB"),
+    h("button", { class: "btn fab" + (dirty() ? " attention" : ""), disabled: !dirty() || !S.srv.installed, onClick: applyDraft, title: dirty() ? "Write your changes to your boot menu and splash (asks for your password or fingerprint)" : "Nothing to apply yet" }, icon("apply"), "Apply"),
   );
 }
 const touch = () => { renderTop(); renderFab(); renderRail(); schedulePreview(); if (S.view === "plymouth") schedulePly(); };
@@ -184,7 +191,7 @@ function vOverview(v) {
     h("div", { class: "hero-card" },
       h("div", { class: "row between" },
         h("div", {},
-          h("h2", {}, S.srv.installed ? "Your boot menu, your way" : "Material GRUB is not installed yet"),
+          h("h2", {}, S.srv.installed ? "Your boot look, your way" : "Material Boot is not installed yet"),
           h("p", { class: "muted" }, S.srv.installed ? "Pick a style, recolour entries, rename, reorder and hide them, all with a live preview. Nothing changes on your system until you press Apply." : "Install the theme first (sudo ./install.sh), then come back here."),
           h("div", { class: "row" }, h("span", { class: "chip ok" }, "version " + (S.srv.version || "?")), h("span", { class: "chip" }, "style " + S.srv.conf.STYLE), h("span", { class: "chip" }, S.srv.scheme + " scheme"), S.srv.demo ? h("span", { class: "chip warn" }, "no boot entries read yet: showing samples") : h("span", { class: "chip" }, S.srv.entries.length + " menu entries")),
         ),
@@ -200,7 +207,7 @@ function vOverview(v) {
       h("div", { class: "row" },
         h("button", { class: "btn tonal small", onClick: refreshStatus }, icon("check"), st ? "Run again" : "Run checks"),
         st ? h("span", { class: "chip " + (st.failed ? "fail" : st.warnings ? "warn" : "ok") }, st.failed ? `${st.failed} failed` : st.warnings ? `${st.warnings} warning(s)` : "everything is fine") : h("span", { class: "muted small" }, "Checks the theme files, grub.cfg, your configuration and overrides."),
-        hint("Runs the same checks as `material-grub doctor`: nothing is changed. Some checks need root to read grub.cfg and say so."),
+        hint("Runs the same checks as `material-boot core doctor`: nothing is changed. Some checks need root to read grub.cfg and say so."),
       ),
       st ? h("div", { style: { marginTop: "14px" } }, ...st.checks.map((c) => h("div", { class: "status-row" }, h("span", { class: "chip " + ({ ok: "ok", warn: "warn", FAIL: "fail", info: "" }[c.status] || "") }, c.status === "FAIL" ? "fail" : c.status), h("span", { class: "what" }, c.check), h("span", { class: "detail" }, c.detail)))) : null,
     ),
@@ -261,7 +268,7 @@ function vEntries(v) {
     ),
     card("Entries",
       rows.length ? entryList(rows, ordered) : h("div", { class: "empty" }, "No boot entries known yet."),
-      S.srv.demo ? h("p", { class: "muted small" }, "These are sample entries: run sudo material-grub apply once to let the theme read your real menu.") : null,
+      S.srv.demo ? h("p", { class: "muted small" }, "These are sample entries: run sudo material-boot core apply once to let the theme read your real menu.") : null,
     ),
   );
   const e = S.srv.entries.find((x) => x.class === S.sel);
@@ -555,7 +562,7 @@ function vPresets(v) {
 function vUpdate(v) {
   const u = S.update;
   v.append(
-    card("Material GRUB " + (S.srv.version ? "v" + S.srv.version : ""),
+    card("Material Boot " + (S.srv.version ? "v" + S.srv.version : ""),
       h("p", { class: "muted" }, `Installed ${S.srv.install_kind === "package" ? "from a package (updates come through your package manager)" : "from source (updates re-run the installer)"}.`),
       h("div", { class: "row" },
         h("button", { class: "btn tonal", onClick: async () => { S.update = null; render(); try { S.update = await api.checkUpdate(); } catch (e) { S.update = { error: e.message }; } render(); } }, icon("update"), "Check for updates"),
@@ -568,7 +575,7 @@ function vUpdate(v) {
     ),
   );
 }
-function runUpdate() { runJob("Updating Material GRUB", () => api.runUpdate(), async () => { await load(); render(); }); }
+function runUpdate() { runJob("Updating Material Boot", () => api.runUpdate(), async () => { await load(); render(); }); }
 
 // ---------------------------------------------------------------- Logs
 function vLogs(v) {

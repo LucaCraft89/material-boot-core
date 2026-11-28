@@ -25,6 +25,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from .. import conf as mgconf
 from .. import (
     custom as mgcustom,  # noqa: F401  (imported early: a broken install fails at start, not on the first preview)
 )
@@ -397,12 +398,56 @@ def api_state(h, q, g):
     return h.send(200, st)
 
 
-def api_status(h, q, g):
-    import cmd_doctor
+def status_summary():
+    """The health of the core and of every part, from the parts' own `doctor` hooks (the same rows as `material-boot core doctor`)."""
+    from .. import __version__, plugins
+    from ..cli import real_core
 
-    d = cmd_doctor.Doctor()
-    d.run(Path(cmd_doctor.__file__).resolve())
-    return h.send(200, d.summary())
+    conf = mgconf.load_conf()
+    rows = [("ok", "material-boot", f"version {__version__}")]
+    found = plugins.discover()
+    ctx = plugins.make_ctx(core=real_core())
+    for p in found:
+        if p.problem:
+            rows.append(("FAIL", p.name, f"{p.version}: {p.problem}"))
+            continue
+        rows.append(("ok", p.name, f"{p.version}  {p.title}"))
+        if "doctor" not in p.hooks:
+            continue
+        r = plugins.call_hook(p, "doctor", ctx)
+        if not r.ok:
+            rows.append(("FAIL", p.name, str(r.error)))
+            continue
+        for level, text in r.value or []:
+            lv = str(level).lower()
+            rows.append(
+                (
+                    "FAIL"
+                    if lv in ("fail", "error")
+                    else "warn"
+                    if lv.startswith("warn")
+                    else "info"
+                    if lv == "info"
+                    else "ok",
+                    p.name,
+                    str(text),
+                )
+            )
+    return {
+        "installed": any(not p.problem for p in found),
+        "version": __version__,
+        "style": conf.get("STYLE"),
+        "scheme": conf.get("SCHEME"),
+        "config": conf,
+        "failed": sum(1 for r in rows if r[0] == "FAIL"),
+        "warnings": sum(1 for r in rows if r[0] == "warn"),
+        "last_error": None,
+        "checks": [{"status": s_, "check": w, "detail": x} for s_, w, x in rows],
+    }
+
+
+def api_status(h, q, g):
+    return h.send(200, status_summary())
 
 
 def api_ping(h, q, g):
