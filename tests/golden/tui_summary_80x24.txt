@@ -1,8 +1,28 @@
-Material Boot installer   step 5 of 6
+Material Boot installer   step 6 of 6
 
-Kernel command line
+Ready to install
 
-   ( ) Yes
- > (*) No
+  Resolution:                 Detected automatically
+  Graphical editor:           No
+  Countdown bar:              Yes
+  Timeout:                    automatic
+  Kernel command line:        No
 
-Up/Down move  Enter select  Esc back  q quit
+The same thing without this screen:
+  material-boot core install
+  and in /etc/material-grub.conf: COUNTDOWN=on
+
+After the install, more customisation:
+  material-boot core colour       one seed colour for everything, or a colour per entry
+  material-boot core overrides    names, colours and icons of single entries, their order and which are hidden
+  material-boot core presets      save the look under a name, apply it again, move it to another machine
+  material-boot core conf         the shared settings (countdown, timeout, hints, Plymouth bar and motion ...)
+  material-grub gui               the graphical editor with a live preview of all of it (if you installed it:
+                                  run this installer again, or `--grub-with-gui`)
+  ./install.sh --tui              this screen again with every look question, on a machine that is set up already
+
+ > Install
+   Back
+   Cancel
+
+Nothing has been changed yet.

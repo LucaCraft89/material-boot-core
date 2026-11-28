@@ -469,6 +469,77 @@ class Preview(unittest.TestCase):
         self.assertEqual(f.values["STYLE"], "rail")  # highlighted, not chosen
 
 
+class OnThisSystem(unittest.TestCase):
+    """The screen says what is installed already (the installer's own notice comes only after the screen)."""
+
+    def parts(self):
+        return make_parts()
+
+    def test_an_update_lists_what_is_installed_and_what_will_happen_to_it(self):
+        lines = tui.existing_lines(self.parts(), {"core", "grub"}, {"core": "1.1.0", "grub": "1.0.0"})
+        self.assertTrue(
+            any("Material GRUB 1.0.0" in x and "will be updated to 1.0.0" not in x for x in lines)
+            or any("Material GRUB 1.0.0" in x for x in lines)
+        )
+        self.assertTrue(any("settings" in x and "kept" in x and "1.1.0" in x for x in lines))
+        self.assertFalse(any("Plymouth" in x for x in lines))  # not installed: not listed
+
+    def test_the_versions_decide_the_wording(self):
+        p = self.parts()
+        newer = tui.existing_lines(p, {"core", "grub"}, {"core": "1.1.0", "grub": "0.7.1"})
+        same = tui.existing_lines(p, {"core", "grub"}, {"core": "1.1.0", "grub": "1.0.0"})
+        older = tui.existing_lines(p, {"core", "grub"}, {"core": "1.1.0", "grub": "2.0.0"})
+        self.assertTrue(any("will be updated" in x for x in newer), newer)
+        self.assertTrue(any("same version" in x for x in same), same)
+        self.assertTrue(any("NEWER" in x and "not be downgraded" in x for x in older), older)
+
+    def test_a_fresh_system_says_nothing_is_installed(self):
+        self.assertEqual(
+            tui.existing_lines(self.parts(), {"core"}, {}), ["Nothing from Material Boot is installed yet."]
+        )
+
+    def test_the_first_screen_and_the_summary_show_it(self):
+        o = options()
+        parts = self.parts()
+        found = tui.existing_lines(parts, {"core", "grub"}, {"core": "1.1.0", "grub": "1.0.0"})
+        f = tui.Flow(
+            tui.build_steps(parts, {"core", "grub"}, o), o, tui.selected_names(parts, {"core", "grub"}, o), found
+        )
+        first = text_of(f.rows(80, 30))
+        self.assertIn("On this system:", first)
+        self.assertIn("Material GRUB 1.0.0", first)
+        while f.current() is not None:
+            press(f, *(["enter", "enter"] if f.current()["kind"] == "text" else ["enter"]))
+        summary = text_of(f.rows(100, 40))
+        self.assertIn("On this system:", summary)
+        self.assertIn("After the install, more customisation:", summary)
+        self.assertIn("material-boot core overrides", summary)
+        self.assertIn("--tui", summary)
+
+    def test_the_plain_prompts_say_it_too(self):
+        o = options("--with", "grub")
+        parts = self.parts()
+        out = io.StringIO()
+        found = tui.existing_lines(parts, {"core", "grub"}, {"core": "1.1.0", "grub": "1.0.0"})
+        f = tui.Flow(
+            tui.build_steps(parts, {"core", "grub"}, o), o, tui.selected_names(parts, {"core", "grub"}, o), found
+        )
+        with redirect_stdout(out):
+            tui.run_plain(f, inp=lambda prompt="": "q", out=print)
+        self.assertIn("On this system:", out.getvalue())
+
+    def test_the_customisation_lines_name_real_core_commands(self):
+        from material_boot import commands
+
+        for ln in tui.after_lines(["grub"]):
+            if ln.startswith("material-boot core "):
+                self.assertIn(ln.split()[2], commands.COMMANDS, ln)
+
+    def test_the_gui_line_is_for_grub_only(self):
+        self.assertTrue(any("material-grub gui" in x for x in tui.after_lines(["grub"])))
+        self.assertFalse(any("material-grub gui" in x for x in tui.after_lines(["plymouth"])))
+
+
 class Scrolling(unittest.TestCase):
     def flow_at_the_seeds(self, *extra):
         o = options("--with", "grub", "--style", "rail", "--scheme", "dark", *extra)
@@ -770,9 +841,13 @@ class Golden(unittest.TestCase):
             "--no-hints",
         )
         self.check("res_80x24", text_of(f.rows(80, 24)))
-        for _ in range(5):
-            press(f, "enter")
+        while (
+            f.current() is not None
+        ):  # the defaults all the way: a text question takes one more Enter (start typing, accept)
+            press(f, *(["enter", "enter"] if f.current()["kind"] == "text" else ["enter"]))
+        self.assertIsNone(f.current(), "the walk must end on the summary")
         self.check("summary_80x24", text_of(f.rows(80, 24)))
+        self.check("summary_120x40", text_of(f.rows(120, 40)))
 
 
 class InTheInstaller(InstallerBase):
