@@ -156,8 +156,8 @@ jobs:
           - {name: Arch,   image: "docker.io/library/archlinux:latest"}
           - {name: openSUSE, image: "registry.opensuse.org/opensuse/tumbleweed:latest"}
     env:
-      PART_GRUB_REF: ${{ vars.PART_GRUB_REF || 'release/0.8.0' }}
-      PART_PLYMOUTH_REF: ${{ vars.PART_PLYMOUTH_REF || 'main' }}
+      PART_GRUB_REF: ${{ vars.PART_GRUB_REF || 'release/1.2.0' }}
+      PART_PLYMOUTH_REF: ${{ vars.PART_PLYMOUTH_REF || 'release/1.2.0' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -191,8 +191,8 @@ jobs:
           - {name: Arch,   image: "docker.io/library/archlinux:latest"}
           - {name: openSUSE, image: "registry.opensuse.org/opensuse/tumbleweed:latest"}
     env:
-      PART_GRUB_REF: ${{ vars.PART_GRUB_REF || 'release/0.8.0' }}
-      PART_PLYMOUTH_REF: ${{ vars.PART_PLYMOUTH_REF || 'main' }}
+      PART_GRUB_REF: ${{ vars.PART_GRUB_REF || 'release/1.2.0' }}
+      PART_PLYMOUTH_REF: ${{ vars.PART_PLYMOUTH_REF || 'release/1.2.0' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
