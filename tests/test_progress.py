@@ -144,6 +144,26 @@ class Live(unittest.TestCase):
         )  # nothing else was printed as a line: the live line was the only trace of the running step
         v.close()
 
+    def test_a_question_is_not_overwritten_by_the_live_line(self):
+        v, out, raw, _l, clock = view(tty=True, live=True)
+        v.begin("Applying the theme")
+        clock.advance(3)
+        v.tick()
+        n = len(raw)
+        with v.paused():
+            self.assertEqual(raw[-1], "\r\x1b[K", "the live line is wiped first")
+            shown = len(raw)
+            for _ in range(
+                3
+            ):  # the ticker thread would redraw every second: nothing may be drawn while the question is there
+                clock.advance(1)
+                v.tick()
+            self.assertEqual(len(raw), shown)
+        self.assertGreater(len(raw), n)
+        self.assertIn("Applying the theme ...", raw[-1])  # and it comes back after the answer
+        v.end()
+        v.close()
+
     def test_the_indicator_moves(self):
         v, _o, raw, _l, _c = view(tty=True, live=True)
         v.begin("x")

@@ -42,7 +42,7 @@ def pump(t):
 
 
 def fail(msg):
-    print(msg + "; the end of the output:\n" + seen.decode(errors="replace")[-3000:])
+    print(msg + "; the end of the output:\n" + seen.decode(errors="replace")[-3000:], flush=True)
     proc.kill()
     sys.exit(1)
 
@@ -66,7 +66,7 @@ def send(keys):
     time.sleep(0.3)
 
 
-wait("What to install", 240)
+wait("What to install", 120)
 pump(1.5)
 for text in ("On this system", "Left from an older version", "remove /usr/local/bin/material-grub"):
     if text.encode() not in seen:
@@ -91,11 +91,27 @@ else:
     wait("Ready to install", 120)
 send(ENTER)  # Install
 wait("material-boot", 900)
-t_end = time.time() + 900
+t_end, last, size = time.time() + 900, time.time(), len(seen)
+asked = 0
 while proc.poll() is None and time.time() < t_end:
     pump(1)
+    if (
+        b"[Y/n]" in seen[pos:]
+    ):  # a part asks something in the middle of its work (Plymouth: may it edit the kernel command line?): the question must be readable
+        question = seen[pos:].decode(errors="replace")
+        pos = len(seen)
+        if "kernel command line" not in question:
+            fail("a question appeared that is not the one expected")
+        asked += 1
+        print("a part asked, in the middle of the install:", question.strip().splitlines()[-1][:100], flush=True)
+        send("n\r")  # not now
+    if len(seen) != size:
+        last, size = time.time(), len(seen)
+    elif time.time() - last > 100:  # a step that prints nothing for 100 s is waiting for something: show what it says
+        fail("the install is waiting (nothing on the screen for 100 s)")
 if proc.poll() is None:
     fail("the install did not finish")
 out = seen.decode(errors="replace")
+print(f"questions asked during the install: {asked}")
 print("SCREEN UPDATE OK" if proc.returncode == 0 else f"exit status {proc.returncode}\n" + out[-2500:])
 sys.exit(proc.returncode)

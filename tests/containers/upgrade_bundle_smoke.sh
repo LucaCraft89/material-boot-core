@@ -28,7 +28,7 @@ snap > /tmp/s1; cmp -s /tmp/s0 /tmp/s1 && say "SYSTEM UNCHANGED by the dry run" 
 say "== the update (${UPDATE_VIA:-yes})"
 case ${UPDATE_VIA:-yes} in
   screen-keep|screen-edit)  # a person at a terminal: the screen, with the keyboard
-    python3 /src/tests/containers/screen_update_drive.py "${UPDATE_VIA#screen-}" > /tmp/up.log 2>&1 && say "update through the screen ($UPDATE_VIA): ok" || { say "update through the screen FAILED"; tail -80 /tmp/up.log | tee -a $R; exit 1; }
+    python3 /src/tests/containers/screen_update_drive.py "${UPDATE_VIA#screen-}" > /tmp/up.log 2>&1 && say "update through the screen ($UPDATE_VIA): ok" || { say "update through the screen FAILED"; tail -80 /tmp/up.log | tee -a $R; cp /tmp/up.log /out/screen-update.log; exit 1; }
     grep -q "the first screen lists what is installed and the leftovers" /tmp/up.log && say "the first screen named what is installed and the leftovers" ;;
   *) sh install.sh --yes > /tmp/up.log 2>&1 && say "update: ok" || { say "update FAILED"; tail -60 /tmp/up.log | tee -a $R; exit 1; } ;;
 esac

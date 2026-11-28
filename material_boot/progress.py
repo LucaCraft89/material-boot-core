@@ -138,6 +138,11 @@ class View:
             self._log("result", text)
             self.write(text)
 
+    def paused(self):
+        """`with view.paused():` while a question is on the screen: the live line is taken away and not redrawn (it would overwrite the question every second), and
+        comes back after."""
+        return _Paused(self)
+
     def close(self):
         with self.lock:
             self.end()
@@ -182,3 +187,23 @@ class View:
         if self.thread:
             self.stop.set()
             self.thread = None
+
+
+class _Paused:
+    def __init__(self, view):
+        self.view = view
+
+    def __enter__(self):
+        v = self.view
+        v.lock.acquire()
+        self.was = v.live
+        v._erase_live()
+        v.live = False  # nothing draws the running step while the question is shown
+        return v
+
+    def __exit__(self, *_exc):
+        v = self.view
+        v.live = self.was
+        if v.cur and v.live and v.verbosity >= LEVEL_NORMAL:
+            v._draw_live()
+        v.lock.release()

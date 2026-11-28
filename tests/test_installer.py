@@ -836,3 +836,50 @@ class ManifestAdditions(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AskPerson(Base):
+    """A part can ask a yes/no question in the middle of its work (`ctx.ask`): only a person at a terminal answers; the progress line stays off the question."""
+
+    def inst(self, *argv, answers=()):
+        o, errs = installer.parse_args(argv, [])
+        self.assertEqual(errs, [])
+        given = list(answers)
+        asked = []
+        i = installer.Installer(o, [], say=lambda *a, **k: None, ask=lambda p: asked.append(p) or given.pop(0))
+        return i, asked
+
+    def tty(self, on=True):
+        import unittest.mock as mock
+
+        return mock.patch.multiple(
+            "sys",
+            stdin=mock.Mock(isatty=lambda: on),
+            stdout=mock.Mock(isatty=lambda: on, write=lambda s: len(s), flush=lambda: None),
+        )
+
+    def test_nobody_to_ask_means_no_without_waiting(self):
+        for argv in (["--yes"], ["--progress", "json"], ["--dry-run"], ["--from-package"]):
+            i, asked = self.inst(*argv)
+            with self.tty():
+                self.assertFalse(i.ask_person("edit the kernel command line?"), argv)
+            self.assertEqual(asked, [], argv)
+        i, asked = self.inst()
+        with self.tty(False):  # a pipe
+            self.assertFalse(i.ask_person("edit?"))
+        self.assertEqual(asked, [])
+
+    def test_a_person_at_a_terminal_answers(self):
+        i, asked = self.inst(answers=["", "n", "No", "y"])
+        with self.tty():
+            self.assertEqual([i.ask_person("edit?") for _ in range(4)], [True, False, False, True])
+        self.assertIn("edit? [Y/n]", asked[0])
+
+    def test_the_parts_get_it_in_their_ctx(self):
+        i, _ = self.inst()
+        self.assertIs(i.ctx().ask.__func__, installer.Installer.ask_person)
+
+    def test_the_default_ctx_answers_no(self):
+        from material_boot import plugins
+
+        self.assertFalse(plugins.make_ctx().ask("anything?"))

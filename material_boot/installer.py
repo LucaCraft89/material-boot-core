@@ -333,6 +333,18 @@ class Installer:
     def overrides_path(self):
         return Path(self.root) / "etc/material-grub/overrides.json" if self.root else mgoverrides.path()
 
+    def ask_person(self, text):
+        """A yes/no question from a part in the middle of its work (True: yes). Only a person at a terminal can answer: a script, a pipe, `--yes` and a JSON run get
+        False at once (a part that needs consent reads `ctx.yes` first). The progress line is taken off the screen while the question is there."""
+        o = self.o
+        if o.yes or o.json or o.from_package or o.dry_run or not (sys.stdin.isatty() and sys.stdout.isatty()):
+            return False
+        with self.view.paused():
+            try:
+                return self.ask(f"\n{text} [Y/n] ").strip().lower() not in ("n", "no")
+            except EOFError:
+                return False
+
     def ctx(self, part=None, dry=None):
         o = self.o
         installed = Path(self.root or "/") / "usr/share/material-boot/data"
@@ -354,6 +366,7 @@ class Installer:
             how=self.how,
             source=self.o.bundle,
             json=bool(o.json),
+            ask=self.ask_person,
         )
 
     # -- the stages

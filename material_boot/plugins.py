@@ -430,12 +430,14 @@ def make_ctx(
     how="source",
     source=None,
     json=False,
+    ask=None,
 ):
     """The `ctx` every hook_<name>(ctx) gets (docs/plugins.md): the `core` object, `root` (a staged tree for tests and packaging; empty for the real
     system), `dry_run`, `yes`, `progress(event)` (the --progress json stream), `options` (the part's own installer choices), `conf` (the settings),
     `backup_dir`, `previous` (what the state record says about this part, or None), `target_version`, `how` (`source`, `package` or `immutable`: how THIS
     run installs) and `source` (the bundle's directory when the run is from a bundle, else None) and `json` (the run is a `--progress json` run: a part that runs a program of its
-    own relays that program's events through `progress` instead of printing, because stdout is the event stream)."""
+    own relays that program's events through `progress` instead of printing, because stdout is the event stream) and `ask(text)` (a yes/no question for the person, True for yes: the installer shows it without
+    the progress line on top of it, and answers False without waiting when nobody can answer: a script, a pipe, a JSON run)."""
     return SimpleNamespace(
         core=core or make_core(),
         root=root,
@@ -450,4 +452,5 @@ def make_ctx(
         how=how,
         source=source,
         json=bool(json),
+        ask=ask or (lambda text: False),
     )
