@@ -13,12 +13,12 @@ The same thing without this screen:
   and in /etc/material-grub.conf: COUNTDOWN=on
 
 After the install, more customisation:
+  material-boot ui                the editor in your browser: every setting below, with a live preview
   material-boot core colour       one seed colour for everything, or a colour per entry
   material-boot core overrides    names, colours and icons of single entries, their order and which are hidden
   material-boot core presets      save the look under a name, apply it again, move it to another machine
   material-boot core conf         the shared settings (countdown, timeout, hints, Plymouth bar and motion ...)
-  material-grub gui               the graphical editor with a live preview of all of it (if you installed it:
-                                  run this installer again, or `--grub-with-gui`)
+  material-boot help              everything, with the options of each command
   ./install.sh --tui              this screen again with every look question, on a machine that is set up already
 
  > Install

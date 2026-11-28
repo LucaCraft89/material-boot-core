@@ -618,9 +618,20 @@ class OnThisSystem(unittest.TestCase):
             if ln.startswith("material-boot core "):
                 self.assertIn(ln.split()[2], commands.COMMANDS, ln)
 
-    def test_the_gui_line_is_for_grub_only(self):
-        self.assertTrue(any("material-grub gui" in x for x in tui.after_lines(["grub"])))
-        self.assertFalse(any("material-grub gui" in x for x in tui.after_lines(["plymouth"])))
+    def test_the_editor_is_the_first_place_to_customise_and_the_old_command_is_not_named(self):
+        for selected in (["grub"], ["plymouth"], ["grub", "plymouth"], []):
+            lines = tui.after_lines(selected)
+            self.assertTrue(lines[0].startswith("material-boot ui "), lines[0])
+            self.assertFalse(any("material-grub " in x for x in lines), selected)
+
+    def test_leftovers_of_an_older_install_are_listed_on_the_first_screen(self):
+        parts = self.parts()
+        found = tui.existing_lines(
+            parts, {"core", "grub"}, {"core": "1.1.0", "grub": "1.1.0"}, ["remove /usr/local/bin/material-grub"]
+        )
+        self.assertIn("Left from an older version (backed up, then removed):", found)
+        self.assertIn("  remove /usr/local/bin/material-grub", found)
+        self.assertFalse(any("Left from" in x for x in tui.existing_lines(parts, {"core", "grub"}, {"core": "1.1.0"})))
 
 
 class Scrolling(unittest.TestCase):

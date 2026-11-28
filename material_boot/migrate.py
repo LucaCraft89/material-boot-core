@@ -80,7 +80,81 @@ class ConfSamples(Step):
         os.replace(tmp, p)
 
 
-STEPS = [ConfSamples()]
+class OldInstall(Step):
+    """1.2.0: what 0.7.x to 1.1 left outside the parts: the `material-grub` command (and its older names), and the old graphical editor (its folder, helper, polkit
+    policy and launcher). The command is replaced by `material-boot grub ...` and the editor by `material-boot ui`. Each file is backed up before it is removed;
+    a file a package owns is left to the package manager (it is only mentioned): the core package replaces material-grub-gui."""
+
+    id = "old-install"
+    since = "1.2.0"
+    title = "remove the old `material-grub` command and the old graphical editor"
+    COMMANDS = (
+        "usr/local/bin/material-grub",
+        "usr/local/sbin/material-grub",
+        "usr/local/bin/material-grub-apply",
+        "usr/local/sbin/material-grub-apply",
+    )
+    GUI_FILES = (
+        "usr/bin/material-grub-gui",
+        "usr/libexec/material-grub-gui-helper",
+        "usr/share/polkit-1/actions/org.material-grub.gui.policy",
+        "usr/share/applications/material-grub-gui.desktop",
+    )
+    GUI_DIR = "usr/share/material-grub-gui"
+    LAUNCHER = "usr/local/share/applications/material-grub-gui.desktop"
+
+    def _found(self, ctx):
+        """[(path, why)] of what is there, without the same file twice (a merged /usr/local/sbin is a link to /usr/local/bin)."""
+        seen, out = set(), []
+        for rel in (*self.COMMANDS, *self.GUI_FILES, self.LAUNCHER):
+            p = ctx.root_path / rel
+            if not (p.exists() or p.is_symlink()):
+                continue
+            real = p.resolve()
+            if real in seen:
+                continue
+            seen.add(real)
+            out.append(p)
+        g = ctx.root_path / self.GUI_DIR
+        if g.is_dir():
+            out.append(g)
+        return out
+
+    def _owner(self, ctx, p):
+        if ctx.root:
+            return "unknown"
+        return mgdetect.owner_of(p)
+
+    def _mine(self, ctx):
+        """(ours to remove, owned by a package)."""
+        ours, owned = [], []
+        for p in self._found(ctx):
+            who = self._owner(ctx, p)
+            (owned if who.startswith("package:") else ours).append(p)
+        return ours, owned
+
+    def touches(self, ctx):
+        files = []
+        for p in self._mine(ctx)[0]:
+            files += [f for f in p.rglob("*") if f.is_file()] if p.is_dir() else [p]
+        return files
+
+    def plan(self, ctx):
+        ours, owned = self._mine(ctx)
+        out = [f"remove /{_rel(ctx, p)}" for p in ours]
+        for p in owned:
+            out.append(f"/{_rel(ctx, p)} belongs to a package: remove it with your package manager (material-grub-gui)")
+        return out
+
+    def apply(self, ctx):
+        for p in self._mine(ctx)[0]:
+            if p.is_dir() and not p.is_symlink():
+                shutil.rmtree(p)
+            else:
+                p.unlink()
+
+
+STEPS = [ConfSamples(), OldInstall()]
 
 
 def context(root="", backup=None, steps=None):

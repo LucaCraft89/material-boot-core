@@ -647,6 +647,12 @@ class Installer:
         return 0 if ok else 1
 
 
+def leftover_lines(root=""):
+    """What an install of 1.1 or older left that this version replaces (the `material-grub` command, the old editor): sentences, empty when there is none."""
+    ctx = migrate.context(root=root)
+    return [x for x in migrate.OldInstall().plan(ctx)]
+
+
 # ---------------------------------------------------------------- the command
 def available_parts(bundle=None):
     """Every part that can be installed: the bundle's (when there is one) and the installed ones; a bundle's record wins, it is the version to install."""
@@ -707,6 +713,7 @@ def main(argv, say=print, ask=None):
             inp=ask or input,
             record=(state.read(o.root) or {}).get("parts"),
             current={"conf": cur_conf, "seed": (cur_ov or {}).get("seed")},
+            leftovers=leftover_lines(o.root),
         ):
             return 1
     chosen, notes, serr = select(parts, installed, o)

@@ -26,6 +26,87 @@ class Base(unittest.TestCase):
         return migrate.context(root=str(self.root), backup=self.backup)
 
 
+class OldInstall(Base):
+    def lay(self, *rels):
+        for rel in rels:
+            p = self.root / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text("#!/bin/sh\n" + rel)
+
+    def full(self):
+        self.lay(
+            "usr/local/bin/material-grub",
+            "usr/local/bin/material-grub-apply",
+            "usr/share/applications/material-grub-gui.desktop",
+            "usr/libexec/material-grub-gui-helper",
+            "usr/share/polkit-1/actions/org.material-grub.gui.policy",
+            "usr/share/material-grub-gui/web/app.js",
+            "usr/share/material-grub-gui/mgserver.py",
+        )
+
+    def test_nothing_old_nothing_to_do(self):
+        self.assertEqual(migrate.OldInstall().plan(self.ctx()), [])
+        self.assertEqual(migrate.run(self.ctx(), [migrate.OldInstall()])[0][1], "skipped")
+
+    def test_the_plan_names_every_file(self):
+        self.full()
+        plan = migrate.OldInstall().plan(self.ctx())
+        for want in (
+            "remove /usr/local/bin/material-grub",
+            "remove /usr/local/bin/material-grub-apply",
+            "remove /usr/share/applications/material-grub-gui.desktop",
+            "remove /usr/share/material-grub-gui",
+            "remove /usr/libexec/material-grub-gui-helper",
+        ):
+            self.assertIn(want, plan)
+
+    def test_it_backs_up_then_removes_and_keeps_what_is_not_old(self):
+        self.full()
+        self.lay("usr/local/bin/material-boot", "etc/material-grub.conf")
+        res = migrate.run(self.ctx(), [migrate.OldInstall()])
+        self.assertEqual(res[0][1], "done", res)
+        for gone in (
+            "usr/local/bin/material-grub",
+            "usr/local/bin/material-grub-apply",
+            "usr/share/material-grub-gui",
+            "usr/share/applications/material-grub-gui.desktop",
+            "usr/libexec/material-grub-gui-helper",
+        ):
+            self.assertFalse((self.root / gone).exists(), gone)
+        self.assertTrue((self.root / "usr/local/bin/material-boot").is_file())
+        self.assertTrue((self.root / "etc/material-grub.conf").is_file())
+        self.assertIn("mgserver.py", (self.backup / "usr/share/material-grub-gui/mgserver.py").name)
+        self.assertTrue((self.backup / "usr/local/bin/material-grub").is_file(), "backed up before it was removed")
+
+    def test_it_is_idempotent(self):
+        self.full()
+        migrate.run(self.ctx(), [migrate.OldInstall()])
+        self.assertEqual(migrate.run(self.ctx(), [migrate.OldInstall()])[0][1], "skipped")
+
+    def test_a_merged_usr_local_sbin_lists_the_command_once(self):
+        self.lay("usr/local/bin/material-grub")
+        (self.root / "usr/local/sbin").symlink_to("bin")
+        plan = migrate.OldInstall().plan(self.ctx())
+        self.assertEqual(
+            [p for p in plan if "material-grub" in p and "sbin" not in p], ["remove /usr/local/bin/material-grub"]
+        )
+        self.assertEqual(len(plan), 1)
+
+    def test_what_a_package_owns_is_only_mentioned(self):
+        self.full()
+        step = migrate.OldInstall()
+        step._owner = lambda ctx, p: "package:rpm" if "gui" in str(p) else "source"
+        plan = step.plan(self.ctx())
+        self.assertIn("remove /usr/local/bin/material-grub", plan)
+        self.assertTrue(any("belongs to a package" in x and "material-grub-gui" in x for x in plan), plan)
+        step.apply(self.ctx())
+        self.assertFalse((self.root / "usr/local/bin/material-grub").exists())
+        self.assertTrue(
+            (self.root / "usr/share/material-grub-gui").is_dir(), "a package's files are not ours to delete"
+        )
+        self.assertTrue((self.root / "usr/libexec/material-grub-gui-helper").is_file())
+
+
 class Planning(unittest.TestCase):
     def test_steps_for_a_version_range(self):
         ids = lambda a, b: [s.id for s in migrate.steps_for(a, b)]  # noqa: E731
@@ -35,6 +116,9 @@ class Planning(unittest.TestCase):
         )  # unknown version: every step up to the target is checked
         self.assertEqual(ids("1.0.0", "1.0.0"), [])  # already there
         self.assertEqual(ids("1.0.0", "1.1.0"), [])
+        self.assertEqual(ids("1.1.1", "1.2.0"), ["old-install"])  # the command and the old editor go with 1.2.0
+        self.assertEqual(ids("0.7.1", "1.2.0"), ["conf-samples", "old-install"])
+        self.assertEqual(ids("1.2.0", "1.2.1"), [])
         self.assertEqual(ids("0.7.1", "0.9.0"), [])  # the step belongs to 1.0.0
 
     def test_backup_dir_names_the_upgrade(self):

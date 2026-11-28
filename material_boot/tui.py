@@ -388,7 +388,7 @@ def _record_version(entry):
     return entry.get("version") if isinstance(entry, dict) else entry
 
 
-def existing_lines(parts, installed, record=None):
+def existing_lines(parts, installed, record=None, leftovers=()):
     """What Material Boot already has on this system, for the top of the screen: one line per part that is installed, with its version and what this run
     would do to it, or one line saying there is nothing yet."""
     record = record or {}
@@ -419,26 +419,23 @@ def existing_lines(parts, installed, record=None):
     core = _record_version(record.get("core"))
     if out and core:
         out.append(f"Your settings (look, colours, entries, presets) are kept. The core is {core}.")
+    if leftovers:
+        out.append("Left from an older version (backed up, then removed):")
+        out += [f"  {x}" for x in leftovers]
     return out or ["Nothing from Material Boot is installed yet."]
 
 
 def after_lines(selected=()):
-    """Where to customise further once it is installed (shown in the summary and after the install)."""
-    lines = [
+    """Where to customise further once it is installed (shown in the summary and after the install): the editor first, then the same things in the terminal."""
+    return [
+        "material-boot ui                the editor in your browser: every setting below, with a live preview",
         "material-boot core colour       one seed colour for everything, or a colour per entry",
         "material-boot core overrides    names, colours and icons of single entries, their order and which are hidden",
         "material-boot core presets      save the look under a name, apply it again, move it to another machine",
         "material-boot core conf         the shared settings (countdown, timeout, hints, Plymouth bar and motion ...)",
+        "material-boot help              everything, with the options of each command",
+        "./install.sh --tui              this screen again with every look question, on a machine that is set up already",
     ]
-    if not selected or "grub" in selected:
-        lines.append(
-            "material-grub gui               the graphical editor with a live preview of all of it (if you installed it:"
-        )
-        lines.append("                                run this installer again, or `--grub-with-gui`)")
-    lines.append(
-        "./install.sh --tui              this screen again with every look question, on a machine that is set up already"
-    )
-    return lines
 
 
 # ---------------------------------------------------------------- the state machine
@@ -1018,12 +1015,12 @@ def wanted(o, tty=None):
     return bool(tty)
 
 
-def run(parts, installed, o, say=print, inp=input, plain=None, tty=None, record=None, current=None):
+def run(parts, installed, o, say=print, inp=input, plain=None, tty=None, record=None, current=None, leftovers=()):
     """Ask, apply the answers to `o`. -> True to go on, False when cancelled. Nothing is written here."""
     steps = build_steps(parts, installed, o, force=o.tui is True, current=current)
     if not steps:
         return True
-    flow = Flow(steps, o, selected_names(parts, installed, o), existing_lines(parts, installed, record))
+    flow = Flow(steps, o, selected_names(parts, installed, o), existing_lines(parts, installed, record, leftovers))
     use_plain = plain
     if use_plain is None:
         use_plain = os.environ.get("TERM", "dumb") in ("dumb", "") or not (sys.stdin.isatty() and sys.stdout.isatty())

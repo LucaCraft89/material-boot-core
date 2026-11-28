@@ -56,7 +56,7 @@ PROVENANCE = [
     (
         "material_boot/migrate.py",
         "install/bin/mgmigrate.py",
-        ["Step", "ConfSamples", "STEPS", "context", "steps_for", "plan", "backup_dir", "_rel", "run"],
+        ["Step", "ConfSamples", "context", "steps_for", "plan", "backup_dir", "_rel", "run"],
     ),
 ]
 
