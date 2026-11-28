@@ -38,7 +38,11 @@ def grub_modules():
     if rec is None or rec.problem or not rec.entry:
         return None
     here = Path(rec.entry).resolve().parent
-    for c in (here / "bin", here / "install/bin", here.parent / "bin"):
+    for c in (
+        here / "bin",
+        here / "install/bin",
+        here.parent / "bin",
+    ):  # package, checkout, and a bundle install (the entry is bin/part_grub.py)
         if (c / "cmd_scenes.py").is_file():
             return c
     return None
