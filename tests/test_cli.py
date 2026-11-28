@@ -61,6 +61,31 @@ class Base(unittest.TestCase):
         return rc, out.getvalue(), err.getvalue()
 
 
+class Pipes(unittest.TestCase):
+    def test_a_reader_that_closes_the_pipe_is_not_an_error(self):
+        """`material-boot version | head -1` and `help | grep -q x`: the reader leaves before the output is written; no traceback."""
+        import subprocess
+
+        p = subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                "import time; time.sleep(0.8); import runpy, sys; sys.argv=['material_boot', 'help']; runpy.run_module('material_boot', run_name='__main__')",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=str(ROOT),
+            env=dict(os.environ, PYTHONPATH=str(ROOT)),
+            stdin=subprocess.DEVNULL,
+        )
+        p.stdout.close()
+        err = p.stderr.read()
+        p.wait()
+        self.assertNotIn("Traceback", err)
+        self.assertNotIn("BrokenPipe", err)
+
+
 class TopLevel(Base):
     def test_only_help_version_menu_and_ui_are_top_level(self):
         self.assertEqual(cli.TOP, ("help", "version", "menu", "ui"))
